@@ -10,7 +10,7 @@ import type { Mutable } from "effect/Types"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@ujiboo/effect-next/Middleware")
+export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-next/Middleware")
 
 /**
  * @since 1.0.0

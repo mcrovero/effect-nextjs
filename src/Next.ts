@@ -9,7 +9,7 @@ import * as NextPage from "./NextPage.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@ujiboo/effect-next/Next")
+export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-next/Next")
 
 /**
  * @since 1.0.0
@@ -85,7 +85,7 @@ const makeProto = <
   function Next() {}
   Object.setPrototypeOf(Next, Proto)
   Object.assign(Next, options)
-  Next.key = `@ujiboo/effect-next/Next`
+  Next.key = `@mattiacrovero/effect-next/Next`
   return Next as any
 }
 
