@@ -1,6 +1,8 @@
 import type { Layer } from "effect"
+import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
+import * as Effect_ from "effect/Effect"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
@@ -72,7 +74,9 @@ export interface NextPage<
     InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware>>
   >(
     build: InnerHandler
-  ): Promise<any>
+  ): Promise<
+    ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never
+  >
 }
 
 export interface Any extends Pipeable {
@@ -106,6 +110,41 @@ const Proto = {
       layer: this.layer,
       middlewares: new Set([...this.middlewares, middleware])
     })
+  },
+
+  run(this: AnyWithProps, build: (ctx: any) => Effect<any, any, any>) {
+    const payload: unknown = undefined
+    const middlewares = this.middlewares
+    const layer = this.layer
+    const program = Effect_.gen(function*() {
+      const context = yield* Effect_.context<never>()
+      let handlerEffect = build(payload as any) as Effect<any, any, any>
+      if (middlewares.size > 0) {
+        const options = { clientId: 0, payload }
+        for (const tag of middlewares) {
+          if (tag.wrap) {
+            const middleware = Context.unsafeGet(context, tag) as any
+            handlerEffect = middleware({ ...options, next: handlerEffect }) as any
+          } else if (tag.optional) {
+            const middleware = Context.unsafeGet(context, tag) as any
+            const previous = handlerEffect
+            handlerEffect = Effect_.matchEffect(middleware(options), {
+              onFailure: () => previous,
+              onSuccess: tag.provides !== undefined
+                ? (value) => Effect_.provideService(previous, tag.provides as any, value)
+                : () => previous
+            })
+          } else {
+            const middleware = Context.unsafeGet(context, tag) as any
+            handlerEffect = tag.provides !== undefined
+              ? Effect_.provideServiceEffect(handlerEffect, tag.provides as any, middleware(options))
+              : Effect_.zipRight(middleware(options), handlerEffect)
+          }
+        }
+      }
+      return yield* handlerEffect
+    }).pipe(Effect_.provide(layer))
+    return Effect_.runPromise(program as Effect<any, any, never>)
   }
 }
 

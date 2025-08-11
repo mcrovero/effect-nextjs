@@ -47,3 +47,4 @@ const _page = Next.make(AuthLive).page("HomePage").middleware(AuthMiddleware).ru
     return user
   })
 )
+console.log(await _page)
