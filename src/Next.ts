@@ -3,6 +3,7 @@ import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
+import * as NextAction from "./NextAction.js"
 import * as NextLayout from "./NextLayout.js"
 import * as NextPage from "./NextPage.js"
 
@@ -61,6 +62,7 @@ export interface Next<
 
   page: (key: string) => NextPage.NextPage<string, Layer, never>
   layout: (key: string) => NextLayout.NextLayout<string, Layer, never>
+  action: (key: string) => NextAction.NextAction<string, Layer, never>
 }
 
 export interface Any extends Pipeable {
@@ -79,6 +81,9 @@ const Proto = {
   },
   layout(this: Any, key: string) {
     return NextLayout.make(key, this.layer)
+  },
+  action(this: Any, key: string) {
+    return NextAction.make(key, this.layer)
   }
 }
 

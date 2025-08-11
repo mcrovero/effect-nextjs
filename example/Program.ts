@@ -80,3 +80,17 @@ const _page2 = Next.make(ProdLive).page("HomePage")
   .setParamsSchema(Schema.Struct({
     id: Schema.String
   }))
+
+
+const _action = Next.make(ProdLive).action("Action")
+  .middleware(AuthMiddleware)
+  .setInputSchema(Schema.Struct({
+    id: Schema.String
+  }))
+  .run(({ input }) =>
+    Effect.gen(function*() {
+      const user = yield* CurrentUser
+      const other = yield* Other
+      return { user, other, params }
+    })
+  )
