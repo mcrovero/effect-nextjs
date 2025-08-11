@@ -35,15 +35,17 @@ export class OtherMiddleware extends NextMiddleware.Tag<OtherMiddleware>()(
   }
 ) {}
 
-const AuthLive = Layer.effect(
+const AuthLive = Layer.succeed(
   AuthMiddleware,
-  Effect.gen(function*() {
-    const user = yield* Other
-    return AuthMiddleware.of(() => Effect.succeed({ id: "123", name: user.name }))
-  })
+  AuthMiddleware.of(() =>
+    Effect.gen(function*() {
+      const user = yield* Other
+      return { id: "123", name: user.name }
+    })
+  )
 )
 
-const OtherMiddlewareLive = Layer.effect(
+const _OtherMiddlewareLive = Layer.effect(
   OtherMiddleware,
   Effect.succeed(OtherMiddleware.of(() => Effect.succeed({ id: "999", name: "other" })))
 )
@@ -71,7 +73,7 @@ const _page = Next.make(ProdLive).page("HomePage")
     })
   )
 
-console.log(await _page)
+console.log(await _page({ params: { id: "abc" } }))
 
 const _page2 = Next.make(ProdLive).page("HomePage")
   .setParamsSchema(Schema.Struct({

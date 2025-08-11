@@ -1,4 +1,4 @@
-import type { Layer } from "effect"
+import { Cause, Exit, type Layer } from "effect"
 import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
@@ -80,7 +80,12 @@ export interface NextPage<
     InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>>
   >(
     build: InnerHandler
-  ): Promise<
+  ): (
+    props?: {
+      readonly params?: Promise<Record<string, string>> | Record<string, string>
+      readonly searchParams?: Promise<Record<string, string>> | Record<string, string>
+    }
+  ) => Promise<
     ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never
   >
 }
@@ -132,64 +137,86 @@ const Proto = {
 
   run(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>,
-    request?: {
-      readonly params?: Promise<Record<string, string>>
-      readonly searchParams?: Promise<Record<string, string>>
-    }
+    build: (ctx: any) => Effect<any, any, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
     const paramsSchema = this.paramsSchema
     const searchParamsSchema = this.searchParamsSchema
-    const program = Effect_.gen(function*() {
-      const context = yield* Effect_.context<never>()
-      const payload = yield* Effect_.gen(function*() {
-        const rawParams = request?.params
-          ? (typeof (request.params as any)?.then === "function" && paramsSchema
-            ? yield* Effect_.promise(() => request!.params as Promise<Record<string, string>>)
-            : request.params)
-          : undefined
-        const rawSearchParams = request?.searchParams && searchParamsSchema
-          ? (typeof (request.searchParams as any)?.then === "function"
-            ? yield* Effect_.promise(() => request!.searchParams as Promise<Record<string, string>>)
-            : request.searchParams)
-          : undefined
-        const decodedParams = paramsSchema && rawParams !== undefined
-          ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
-          : rawParams
-        const decodedSearchParams = searchParamsSchema && rawSearchParams !== undefined
-          ? yield* (Schema_ as any).decodeUnknown(searchParamsSchema)(rawSearchParams)
-          : rawSearchParams
-        return { params: decodedParams, searchParams: decodedSearchParams }
-      })
-      let handlerEffect = build(payload as any) as Effect<any, any, any>
-      if (middlewares.size > 0) {
-        const options = { clientId: 0, payload }
-        for (const tag of middlewares) {
-          if (tag.wrap) {
-            const middleware = Context.unsafeGet(context, tag) as any
-            handlerEffect = middleware({ ...options, next: handlerEffect }) as any
-          } else if (tag.optional) {
-            const middleware = Context.unsafeGet(context, tag) as any
-            const previous = handlerEffect
-            handlerEffect = Effect_.matchEffect(middleware(options), {
-              onFailure: () => previous,
-              onSuccess: tag.provides !== undefined
-                ? (value) => Effect_.provideService(previous, tag.provides as any, value)
-                : () => previous
-            })
-          } else {
-            const middleware = Context.unsafeGet(context, tag) as any
-            handlerEffect = tag.provides !== undefined
-              ? Effect_.provideServiceEffect(handlerEffect, tag.provides as any, middleware(options))
-              : Effect_.zipRight(middleware(options), handlerEffect)
+    return (props?: {
+      readonly params?: Promise<Record<string, string>> | Record<string, string>
+      readonly searchParams?: Promise<Record<string, string>> | Record<string, string>
+    }) => {
+      const program = Effect_.gen(function*() {
+        const context = yield* Effect_.context<never>()
+        const payload = yield* Effect_.gen(function*() {
+          const rawParams = props?.params
+            ? (typeof (props.params as any)?.then === "function" && paramsSchema
+              ? yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
+              : props.params)
+            : undefined
+          const rawSearchParams = props?.searchParams && searchParamsSchema
+            ? (typeof (props.searchParams as any)?.then === "function"
+              ? yield* Effect_.promise(() => props!.searchParams as Promise<Record<string, string>>)
+              : props.searchParams)
+            : undefined
+          const decodedParams = paramsSchema && rawParams !== undefined
+            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
+            : rawParams
+          const decodedSearchParams = searchParamsSchema && rawSearchParams !== undefined
+            ? yield* (Schema_ as any).decodeUnknown(searchParamsSchema)(rawSearchParams)
+            : rawSearchParams
+          return { params: decodedParams, searchParams: decodedSearchParams }
+        })
+        let handlerEffect = build(payload as any) as Effect<any, any, any>
+        if (middlewares.size > 0) {
+          const options = { clientId: 0, payload }
+          for (const tag of middlewares) {
+            if (tag.wrap) {
+              const middleware = Context.unsafeGet(context, tag) as any
+              handlerEffect = middleware({ ...options, next: handlerEffect }) as any
+            } else if (tag.optional) {
+              const middleware = Context.unsafeGet(context, tag) as any
+              const previous = handlerEffect
+              handlerEffect = Effect_.matchEffect(middleware(options), {
+                onFailure: () => previous,
+                onSuccess: tag.provides !== undefined
+                  ? (value) => Effect_.provideService(previous, tag.provides as any, value)
+                  : () => previous
+              })
+            } else {
+              const middleware = Context.unsafeGet(context, tag) as any
+              handlerEffect = tag.provides !== undefined
+                ? Effect_.provideServiceEffect(handlerEffect, tag.provides as any, middleware(options))
+                : Effect_.zipRight(middleware(options), handlerEffect)
+            }
           }
         }
-      }
-      return yield* handlerEffect
-    }).pipe(Effect_.provide(layer))
-    return Effect_.runPromise(program as Effect<any, any, never>)
+        return yield* handlerEffect
+      }).pipe(Effect_.provide(layer))
+
+      /**
+       * Workaround to handle redirect errors
+       */
+      return Effect_.runPromiseExit(program as Effect<any, any, never>).then((result) => {
+        if (Exit.isFailure(result)) {
+          const mappedError = Cause.match<any | Error, any>(result.cause, {
+            onEmpty: new Error("empty"),
+            onFail: (error) => {
+              return error
+            },
+            onDie: (defect) => {
+              return defect
+            },
+            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
+            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
+            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
+          })
+          throw mappedError
+        }
+        return result.value
+      })
+    }
   }
 }
 

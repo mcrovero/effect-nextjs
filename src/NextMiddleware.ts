@@ -22,20 +22,20 @@ export type TypeId = typeof TypeId
  * @since 1.0.0
  * @category models
  */
-export interface NextMiddleware<Provides, E> {
-  (options: { readonly clientId: number; readonly payload: unknown }): Effect.Effect<Provides, E>
+export interface NextMiddleware<Provides, E, R> {
+  (options: { readonly clientId: number; readonly payload: unknown }): Effect.Effect<Provides, E, R>
 }
 
 /**
  * @since 1.0.0
  * @category models
  */
-export interface NextMiddlewareWrap<Provides, E> {
+export interface NextMiddlewareWrap<Provides, E, R> {
   (options: {
     readonly clientId: number
     readonly payload: unknown
     readonly next: Effect.Effect<SuccessValue, E, Provides>
-  }): Effect.Effect<SuccessValue, E>
+  }): Effect.Effect<SuccessValue, E, R>
 }
 
 /**
@@ -58,12 +58,12 @@ export interface Any {
  * @since 1.0.0
  * @category models
  */
-export type TagClass<Self, Name extends string, Options> = TagClass.Base<
+export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
   Self,
   Name,
   Options,
-  TagClass.Wrap<Options> extends true ? NextMiddlewareWrap<TagClass.Provides<Options>, TagClass.Failure<Options>>
-    : NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>>
+  TagClass.Wrap<Options> extends true ? NextMiddlewareWrap<TagClass.Provides<Options>, TagClass.Failure<Options>, R>
+    : NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>, R>
 >
 
 /**
@@ -165,7 +165,7 @@ export interface TagClassAny extends Context.Tag<any, any> {
  * @category models
  */
 export interface TagClassAnyWithProps
-  extends Context.Tag<any, NextMiddleware<any, any> | NextMiddlewareWrap<any, any>>
+  extends Context.Tag<any, NextMiddleware<any, any, any> | NextMiddlewareWrap<any, any, any>>
 {
   readonly [TypeId]: TypeId
   readonly optional: boolean
@@ -185,11 +185,12 @@ export const Tag = <Self>(): <
     readonly optional?: boolean
     readonly failure?: Schema.Schema.All
     readonly provides?: Context.Tag<any, any>
-  }
+  },
+  R
 >(
   id: Name,
   options?: Options | undefined
-) => TagClass<Self, Name, Options> =>
+) => TagClass<Self, Name, Options, R> =>
 (
   id: string,
   options?: {
