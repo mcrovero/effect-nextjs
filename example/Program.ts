@@ -4,7 +4,6 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import { NextPage } from "../src/index.js"
 
 // A simple context tag for the current user
 export class CurrentUser extends Context.Tag("CurrentUser")<
@@ -56,12 +55,25 @@ const OtherLive = Layer.effect(
 
 const ProdLive = Layer.mergeAll(AuthLive.pipe(Layer.provide(OtherLive)), OtherLive)
 
-const _page = Next.make(ProdLive).page("HomePage").middleware(AuthMiddleware).run(() =>
-  Effect.gen(function*() {
-    const user = yield* CurrentUser
-    const other = yield* Other
-    return { user, other }
-  })
-)
+const _page = Next.make(ProdLive).page("HomePage")
+  .setParamsSchema(Schema.Struct({
+    id: Schema.String
+  }))
+  // .setSearchParamsSchema(Schema.Struct({
+  //   id: Schema.String
+  // }))
+  .middleware(AuthMiddleware)
+  .run(({ params }) =>
+    Effect.gen(function*() {
+      const user = yield* CurrentUser
+      const other = yield* Other
+      return { user, other, params }
+    })
+  )
+
 console.log(await _page)
 
+const _page2 = Next.make(ProdLive).page("HomePage")
+  .setParamsSchema(Schema.Struct({
+    id: Schema.String
+  }))

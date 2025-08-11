@@ -6,6 +6,7 @@ import * as Effect_ from "effect/Effect"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
+import * as Schema_ from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 // import type { Scope } from "effect/Scope"
 import type { NextMiddleware } from "./index.js"
@@ -45,6 +46,8 @@ export interface AnyWithProps {
   readonly key: string
   readonly middlewares: ReadonlySet<NextMiddleware.TagClassAnyWithProps>
   readonly layer: Layer.Layer<any, any, any>
+  readonly paramsSchema?: AnySchema
+  readonly searchParamsSchema?: AnySchema
 }
 
 type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
@@ -52,7 +55,9 @@ type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<
 export interface NextPage<
   in out Tag extends string,
   in out L extends Layer.Layer<any, any, any>,
-  out Middleware extends NextMiddleware.TagClassAny = never
+  out Middleware extends NextMiddleware.TagClassAny = never,
+  out ParamsA = undefined,
+  out SearchParamsA = undefined
 > extends Pipeable {
   new(_: never): object
 
@@ -61,13 +66,18 @@ export interface NextPage<
   readonly key: string
   readonly middlewares: ReadonlySet<Middleware>
   readonly layer: L
+  readonly paramsSchema?: AnySchema
+  readonly searchParamsSchema?: AnySchema
 
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
-  ): NextPage<Tag, L, Middleware | M>
+  ): NextPage<Tag, L, Middleware | M, ParamsA, SearchParamsA>
+
+  setParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, S["Type"], SearchParamsA>
+  setSearchParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, ParamsA, S["Type"]>
 
   run<
-    InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware>>
+    InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>>
   >(
     build: InnerHandler
   ): Promise<
@@ -81,18 +91,8 @@ export interface Any extends Pipeable {
   readonly key: string
   readonly middlewares: ReadonlySet<NextMiddleware.TagClassAny>
   readonly layer: Layer.Layer<any, any, any>
-}
-
-/**
- * Represents an implemented rpc.
- *
- * @since 1.0.0
- * @category models
- */
-export interface Handler<Tag extends string> {
-  readonly _: unique symbol
-  readonly tag: Tag
-  readonly handler: (request: any) => Effect<any, any>
+  readonly paramsSchema?: AnySchema
+  readonly searchParamsSchema?: AnySchema
 }
 
 const Proto = {
@@ -107,13 +107,62 @@ const Proto = {
       middlewares: new Set([...this.middlewares, middleware])
     })
   },
+  setParamsSchema(this: AnyWithProps, schema: AnySchema) {
+    const options = {
+      _tag: this._tag,
+      layer: this.layer,
+      middlewares: this.middlewares,
+      ...(schema !== undefined ? { paramsSchema: schema } as const : {}),
+      ...(this.searchParamsSchema !== undefined
+        ? { searchParamsSchema: this.searchParamsSchema } as const
+        : {})
+    }
+    return makeProto(options)
+  },
+  setSearchParamsSchema(this: AnyWithProps, schema: AnySchema) {
+    const options = {
+      _tag: this._tag,
+      layer: this.layer,
+      middlewares: this.middlewares,
+      ...(this.paramsSchema !== undefined ? { paramsSchema: this.paramsSchema } as const : {}),
+      ...(schema !== undefined ? { searchParamsSchema: schema } as const : {})
+    }
+    return makeProto(options)
+  },
 
-  run(this: AnyWithProps, build: (ctx: any) => Effect<any, any, any>) {
-    const payload: unknown = undefined
+  run(
+    this: AnyWithProps,
+    build: (ctx: any) => Effect<any, any, any>,
+    request?: {
+      readonly params?: Promise<Record<string, string>>
+      readonly searchParams?: Promise<Record<string, string>>
+    }
+  ) {
     const middlewares = this.middlewares
     const layer = this.layer
+    const paramsSchema = this.paramsSchema
+    const searchParamsSchema = this.searchParamsSchema
     const program = Effect_.gen(function*() {
       const context = yield* Effect_.context<never>()
+      const payload = yield* Effect_.gen(function*() {
+        const rawParams = request?.params
+          ? (typeof (request.params as any)?.then === "function" && paramsSchema
+            ? yield* Effect_.promise(() => request!.params as Promise<Record<string, string>>)
+            : request.params)
+          : undefined
+        const rawSearchParams = request?.searchParams && searchParamsSchema
+          ? (typeof (request.searchParams as any)?.then === "function"
+            ? yield* Effect_.promise(() => request!.searchParams as Promise<Record<string, string>>)
+            : request.searchParams)
+          : undefined
+        const decodedParams = paramsSchema && rawParams !== undefined
+          ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
+          : rawParams
+        const decodedSearchParams = searchParamsSchema && rawSearchParams !== undefined
+          ? yield* (Schema_ as any).decodeUnknown(searchParamsSchema)(rawSearchParams)
+          : rawSearchParams
+        return { params: decodedParams, searchParams: decodedSearchParams }
+      })
       let handlerEffect = build(payload as any) as Effect<any, any, any>
       if (middlewares.size > 0) {
         const options = { clientId: 0, payload }
@@ -152,6 +201,8 @@ const makeProto = <
   readonly _tag: Tag
   readonly layer: L
   readonly middlewares: ReadonlySet<Middleware>
+  readonly paramsSchema?: AnySchema
+  readonly searchParamsSchema?: AnySchema
 }): NextPage<Tag, L, Middleware> => {
   function NextPage() {}
   Object.setPrototypeOf(NextPage, Proto)
@@ -185,13 +236,6 @@ export const make = <
 export type Middleware<R> = R extends NextPage<infer _Tag, infer _Layer, infer _Middleware>
   ? Context_.Tag.Identifier<_Middleware>
   : never
-/**
- * Represents an implemented rpc.
- *
- * @since 1.0.0
- * @category models
- */
-// (moved to NextPage namespace)
 
 /**
  * @since 1.0.0
@@ -203,7 +247,8 @@ export type HandlerFrom<P extends Any> = P extends Any ? ToHandlerFn<P> : never
  * @since 1.0.0
  * @category models
  */
-export type ExtractProvides<R extends Any> = R extends NextPage<infer _Tag, infer _Layer, infer _Middleware>
+export type ExtractProvides<R extends Any> = R extends
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA>
   ? LayerSuccess<_Layer> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
@@ -212,6 +257,18 @@ export type ExtractProvides<R extends Any> = R extends NextPage<infer _Tag, infe
  * @category models
  */
 export type ExcludeProvides<Env, R extends Any> = Exclude<Env, ExtractProvides<R>>
+
+/**
+ * Represents an implemented rpc.
+ *
+ * @since 1.0.0
+ * @category models
+ */
+export interface Handler<Tag extends string> {
+  readonly _: unique symbol
+  readonly tag: Tag
+  readonly handler: (request: any) => Effect<any, any>
+}
 
 /**
  * @since 1.0.0
@@ -224,7 +281,10 @@ export type ToHandler<R extends Any> = R extends NextPage<infer _Tag, infer _Mid
  * @since 1.0.0
  * @category models
  */
-export type ToHandlerFn<R extends Any> = (request: any) => Effect<any, any, ExtractProvides<R>>
+export type ToHandlerFn<R extends Any> = (request: {
+  readonly params: Params<R>
+  readonly searchParams: SearchParams<R>
+}) => Effect<any, any, ExtractProvides<R>>
 
 /**
  * @since 1.0.0
@@ -233,4 +293,14 @@ export type ToHandlerFn<R extends Any> = (request: any) => Effect<any, any, Extr
 export type HandlerContext<P extends Any, Handler> = Handler extends (
   ...args: any
 ) => Effect<infer _A, infer _E, infer _R> ? ExcludeProvides<_R, P>
+  : never
+
+export type Params<P extends Any> = P extends
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer ParamsA, infer _SearchParamsA> ?
+  ParamsA extends undefined ? Promise<Record<string, string>> : ParamsA
+  : never
+
+export type SearchParams<P extends Any> = P extends
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer SearchParamsA> ?
+  SearchParamsA extends undefined ? Promise<Record<string, string>> : SearchParamsA
   : never
