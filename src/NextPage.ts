@@ -63,14 +63,10 @@ export interface NextPage<
   readonly layer: L
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    // middleware: M
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextPage<Tag, L, Middleware | M>
 
-  // run(handler: (ctx: any) => Effect<any, any, any>): Promise<any>
-
   run<
-    const Tag extends string,
     InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware>>
   >(
     build: InnerHandler
@@ -202,16 +198,13 @@ export type Middleware<R> = R extends NextPage<infer _Tag, infer _Layer, infer _
  * @category groups
  */
 export type HandlerFrom<P extends Any> = P extends Any ? ToHandlerFn<P> : never
+
 /**
  * @since 1.0.0
  * @category models
  */
-export type ExtractProvides<R extends Any> = R extends NextPage<infer _Tag, infer _Layer, infer _Middleware> ?
-  Context_.Tag.Identifier<_Middleware> extends Layer.Layer<infer _ROut, any, any> ? _ROut :
-  _Middleware extends {
-    readonly provides: Context_.Tag<infer _I, infer _S>
-  } ? _I
-  : never
+export type ExtractProvides<R extends Any> = R extends NextPage<infer _Tag, infer _Layer, infer _Middleware>
+  ? LayerSuccess<_Layer> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
 /**

@@ -94,7 +94,7 @@ const makeProto = <
  * @category constructors
  */
 export const make = <
-  const Layer extends Layer.Layer<any, any, any>
+  const Layer extends Layer.Layer<any, any, never>
 >(
   layer: Layer
 ): Next<Layer> => {

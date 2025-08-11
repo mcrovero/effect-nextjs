@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import { NextPage } from "../src/index.js"
 
 // A simple context tag for the current user
 export class CurrentUser extends Context.Tag("CurrentUser")<
@@ -35,16 +36,32 @@ export class OtherMiddleware extends NextMiddleware.Tag<OtherMiddleware>()(
   }
 ) {}
 
-// Live middleware implementation that extracts the user (dummy example)
-export const AuthLive: Layer.Layer<AuthMiddleware> = Layer.succeed(
+const AuthLive = Layer.effect(
   AuthMiddleware,
-  AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "John Doe" }))
+  Effect.gen(function*() {
+    const user = yield* Other
+    return AuthMiddleware.of(() => Effect.succeed({ id: "123", name: user.name }))
+  })
 )
 
-const _page = Next.make(AuthLive).page("HomePage").middleware(AuthMiddleware).run(() =>
+const OtherMiddlewareLive = Layer.effect(
+  OtherMiddleware,
+  Effect.succeed(OtherMiddleware.of(() => Effect.succeed({ id: "999", name: "other" })))
+)
+
+const OtherLive = Layer.effect(
+  Other,
+  Effect.succeed({ id: "999", name: "other" })
+)
+
+const ProdLive = Layer.mergeAll(AuthLive.pipe(Layer.provide(OtherLive)), OtherLive)
+
+const _page = Next.make(ProdLive).page("HomePage").middleware(AuthMiddleware).run(() =>
   Effect.gen(function*() {
     const user = yield* CurrentUser
-    return user
+    const other = yield* Other
+    return { user, other }
   })
 )
 console.log(await _page)
+
