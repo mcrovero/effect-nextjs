@@ -38,16 +38,12 @@ export class OtherMiddleware extends NextMiddleware.Tag<OtherMiddleware>()(
 // Live middleware implementation that extracts the user (dummy example)
 export const AuthLive: Layer.Layer<AuthMiddleware> = Layer.succeed(
   AuthMiddleware,
-  AuthMiddleware.of(() => Effect.fail("test"))
+  AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "John Doe" }))
 )
 
-const page = Next.make("HomePage").middleware(AuthMiddleware).toLayerHandler(() =>
+const _page = Next.make(AuthLive).page("HomePage").middleware(AuthMiddleware).run(() =>
   Effect.gen(function*() {
     const user = yield* CurrentUser
     return user
   })
 )
-
-const main = Layer.launch(page)
-
-Effect.runPromise(main)
