@@ -18,12 +18,24 @@ export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-next/Midd
  */
 export type TypeId = typeof TypeId
 
+type MiddlewareOptions = {
+  readonly _type: "page"
+  readonly params: Promise<Record<string, string>>
+  readonly searchParams?: Promise<Record<string, string>>
+} | {
+  readonly _type: "layout"
+  readonly params: Promise<Record<string, string>>
+  readonly children: unknown
+} | {
+  readonly _type: "action"
+}
+
 /**
  * @since 1.0.0
  * @category models
  */
 export interface NextMiddleware<Provides, E, R> {
-  (options: { readonly clientId: number; readonly payload: unknown }): Effect.Effect<Provides, E, R>
+  (options: MiddlewareOptions): Effect.Effect<Provides, E, R>
 }
 
 /**
@@ -31,11 +43,9 @@ export interface NextMiddleware<Provides, E, R> {
  * @category models
  */
 export interface NextMiddlewareWrap<Provides, E, R> {
-  (options: {
-    readonly clientId: number
-    readonly payload: unknown
-    readonly next: Effect.Effect<SuccessValue, E, Provides>
-  }): Effect.Effect<SuccessValue, E, R>
+  (
+    options: MiddlewareOptions & { readonly next: Effect.Effect<SuccessValue, E, Provides> }
+  ): Effect.Effect<SuccessValue, E, R>
 }
 
 /**

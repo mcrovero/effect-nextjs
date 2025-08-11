@@ -37,9 +37,10 @@ export class OtherMiddleware extends NextMiddleware.Tag<OtherMiddleware>()(
 
 const AuthLive = Layer.succeed(
   AuthMiddleware,
-  AuthMiddleware.of(() =>
+  AuthMiddleware.of((props) =>
     Effect.gen(function*() {
       const user = yield* Other
+      yield* Effect.log(props)
       return { id: "123", name: user.name }
     })
   )

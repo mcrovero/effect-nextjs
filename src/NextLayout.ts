@@ -143,7 +143,7 @@ const Proto = {
         })
         let handlerEffect = build(payload as any) as Effect<any, any, any>
         if (middlewares.size > 0) {
-          const options = { clientId: 0, payload }
+          const options = { _type: "layout", params: props?.params, children: props?.children }
           for (const tag of middlewares) {
             if (tag.wrap) {
               const middleware = Context.unsafeGet(context, tag) as any
