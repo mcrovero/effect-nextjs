@@ -7,7 +7,6 @@ import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
 import * as Schema_ from "effect/Schema"
-import type * as AST from "effect/SchemaAST"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -24,19 +23,6 @@ export type TypeId = typeof TypeId
 
 /**
  * @since 1.0.0
- * @category constructors
- */
-export interface AnySchema extends Pipeable {
-  readonly [Schema.TypeId]: any
-  readonly Type: any
-  readonly Encoded: any
-  readonly Context: any
-  readonly make?: (params: any, ...rest: ReadonlyArray<any>) => any
-  readonly ast: AST.AST
-}
-
-/**
- * @since 1.0.0
  * @category models
  */
 export interface AnyWithProps {
@@ -45,7 +31,7 @@ export interface AnyWithProps {
   readonly key: string
   readonly middlewares: ReadonlySet<NextMiddleware.TagClassAnyWithProps>
   readonly layer: Layer.Layer<any, any, any>
-  readonly inputSchema?: AnySchema
+  readonly inputSchema?: Schema.Schema.All
 }
 
 type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
@@ -63,13 +49,13 @@ export interface NextAction<
   readonly key: string
   readonly middlewares: ReadonlySet<Middleware>
   readonly layer: L
-  readonly inputSchema?: AnySchema
+  readonly inputSchema?: Schema.Schema.All
 
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextAction<Tag, L, Middleware | M, InputA>
 
-  setInputSchema<S extends AnySchema>(schema: S): NextAction<Tag, L, Middleware, S["Type"]>
+  setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
 
   run<
     InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>,
@@ -93,7 +79,7 @@ export interface Any extends Pipeable {
   readonly key: string
   readonly middlewares: ReadonlySet<NextMiddleware.TagClassAny>
   readonly layer: Layer.Layer<any, any, any>
-  readonly inputSchema?: AnySchema
+  readonly inputSchema?: Schema.Schema.All
 }
 
 const Proto = {
@@ -109,7 +95,7 @@ const Proto = {
       ...(this.inputSchema !== undefined ? { inputSchema: this.inputSchema } as const : {})
     })
   },
-  setInputSchema(this: AnyWithProps, schema: AnySchema) {
+  setInputSchema(this: AnyWithProps, schema: Schema.Schema.All) {
     const options = {
       _tag: this._tag,
       layer: this.layer,
@@ -211,7 +197,7 @@ const makeProto = <
   readonly _tag: Tag
   readonly layer: L
   readonly middlewares: ReadonlySet<Middleware>
-  readonly inputSchema?: AnySchema
+  readonly inputSchema?: Schema.Schema.All
 }): NextAction<Tag, L, Middleware> => {
   function NextAction() {}
   Object.setPrototypeOf(NextAction, Proto)
@@ -291,7 +277,7 @@ export type ToHandler<R extends Any> = R extends NextAction<infer _Tag, infer _M
  * @category models
  */
 export type ToHandlerFn<R extends Any> = (request: {
-  readonly input: Input<R>
+  readonly input: HandlerInput<R>
 }) => Promise<Effect<any, any, ExtractProvides<R>>>
 
 /**
@@ -304,12 +290,16 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
   : never
 
 export type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
-  InputA extends undefined ? unknown : InputA
+  InputA extends Schema.Schema<infer _encoded, infer decoded, infer _c> ? decoded : unknown
+  : never
+
+export type HandlerInput<P extends Any> = P extends
+  NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
+  InputA extends Schema.Schema<infer encoded, infer _decoded, infer _c> ? encoded : unknown
   : never
 
 // Error typing helpers for run onError
 type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
-
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>
   : never
 

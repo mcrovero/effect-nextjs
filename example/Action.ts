@@ -1,7 +1,6 @@
-import { Layer } from "effect"
+import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Schema from "effect/Schema"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
@@ -25,7 +24,7 @@ const _AuthLive = Layer.succeed(
 
 const _action = Next.make(_AuthLive).action("HomePage")
   .setInputSchema(Schema.Struct({
-    id: Schema.String
+    id: Schema.NumberFromString
   }))
   .middleware(AuthMiddleware)
   .run(async ({ input }) =>
