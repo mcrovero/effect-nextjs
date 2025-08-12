@@ -1,4 +1,4 @@
-import type { Layer } from "effect"
+import { Cause, Exit, type Layer } from "effect"
 import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
@@ -121,13 +121,13 @@ const Proto = {
 
   run(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>,
+    build: (ctx: any) => Promise<Effect<any, any, any>>,
     onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
     const inputSchema = this.inputSchema
-    return (inputArg: unknown) => {
+    return async (inputArg: unknown) => {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const payload = yield* Effect_.gen(function*() {
@@ -137,7 +137,7 @@ const Proto = {
             : rawInput
           return { input: decodedInput }
         })
-        let handlerEffect = build(payload as any) as Effect<any, any, any>
+        let handlerEffect = yield* Effect_.promise(() => build(payload as any))
         if (middlewares.size > 0) {
           const options = { _type: "action" as const }
           for (const tag of middlewares) {
@@ -169,7 +169,36 @@ const Proto = {
         onSuccess: (value) => Effect_.succeed(value)
       })
 
-      return Effect_.runPromise(handled as Effect<any, never, never>)
+      /**
+       * Workaround to handle redirect errors
+       */
+      return Effect_.runPromiseExit(handled).then((result) => {
+        if (Exit.isFailure(result)) {
+          const mappedError = Cause.match<any, any>(result.cause, {
+            onEmpty: () => {
+              throw new Error("empty")
+            },
+            onFail: (error) => error,
+            onDie: (defect) => {
+              throw defect
+            },
+            onInterrupt: (fiberId) => {
+              throw new Error(`Interrupted`, { cause: fiberId })
+            },
+            onSequential: (left, right) => {
+              throw new Error(`Sequential (left: ${left}) (right: ${right})`)
+            },
+            onParallel: (left, right) => {
+              throw new Error(`Parallel (left: ${left}) (right: ${right})`)
+            }
+          })
+          if (onError) {
+            return onError(mappedError) as any
+          }
+          throw mappedError
+        }
+        return result.value
+      })
     }
   }
 }
@@ -263,7 +292,7 @@ export type ToHandler<R extends Any> = R extends NextAction<infer _Tag, infer _M
  */
 export type ToHandlerFn<R extends Any> = (request: {
   readonly input: Input<R>
-}) => Effect<any, any, ExtractProvides<R>>
+}) => Promise<Effect<any, any, ExtractProvides<R>>>
 
 /**
  * @since 1.0.0
