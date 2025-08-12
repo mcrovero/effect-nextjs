@@ -2,7 +2,7 @@ import { Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { Next } from "../src/index.js"
+import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 // A simple context tag for the current user
