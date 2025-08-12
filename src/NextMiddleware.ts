@@ -37,8 +37,18 @@ type MiddlewareOptions = {
  * @since 1.0.0
  * @category models
  */
-export interface NextMiddleware<Provides, E, R> {
+export interface NextMiddleware<Provides, E, R = never> {
   (options: MiddlewareOptions): Effect.Effect<Provides, E, R>
+}
+
+/**
+ * @since 1.0.0
+ * @category models
+ */
+export interface NextMiddlewareWrap<Provides, E, R> {
+  (
+    options: MiddlewareOptions & { readonly next: Effect.Effect<SuccessValue, E, Provides> }
+  ): Effect.Effect<SuccessValue, E, R>
 }
 
 /**
@@ -54,7 +64,7 @@ export interface SuccessValue {
  * @category models
  */
 export interface Any {
-  (options: { readonly payload: unknown; readonly next?: Effect.Effect<any, any, any> }): Effect.Effect<any, any>
+  (options: { readonly payload: unknown; readonly next?: Effect.Effect<any, any, any> }): Effect.Effect<any, any, any>
 }
 
 /**
@@ -65,7 +75,8 @@ export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
   Self,
   Name,
   Options,
-  NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>, R>
+  TagClass.Wrap<Options> extends true ? NextMiddlewareWrap<TagClass.Provides<Options>, TagClass.Failure<Options>, R>
+    : NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>, R>
 >
 
 /**
@@ -134,12 +145,19 @@ export declare namespace TagClass {
    * @since 1.0.0
    * @category models
    */
+  export type Wrap<Options> = Options extends { readonly wrap: true } ? true : false
+
+  /**
+   * @since 1.0.0
+   * @category models
+   */
   export interface Base<Self, Name extends string, Options, Service> extends Context.Tag<Self, Service> {
     new(_: never): Context.TagClassShape<Name, Service>
     readonly [TypeId]: TypeId
     readonly optional: Optional<Options>
     readonly failure: FailureSchema<Options>
     readonly provides: Options extends { readonly provides: Context.Tag<any, any> } ? Options["provides"] : undefined
+    readonly wrap: Wrap<Options>
   }
 }
 
@@ -152,17 +170,19 @@ export interface TagClassAny extends Context.Tag<any, any> {
   readonly optional: boolean
   readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
+  readonly wrap: boolean
 }
 
 /**
  * @since 1.0.0
  * @category models
  */
-export interface TagClassAnyWithProps extends Context.Tag<any, NextMiddleware<any, any, any>> {
+export interface TagClassAnyWithProps extends Context.Tag<any, any> {
   readonly [TypeId]: TypeId
   readonly optional: boolean
   readonly provides?: Context.Tag<any, any>
   readonly failure: Schema.Schema.All
+  readonly wrap: boolean
 }
 
 /**
@@ -172,18 +192,19 @@ export interface TagClassAnyWithProps extends Context.Tag<any, NextMiddleware<an
 export const Tag = <Self>(): <
   const Name extends string,
   const Options extends {
+    readonly wrap?: boolean
     readonly optional?: boolean
     readonly failure?: Schema.Schema.All
     readonly provides?: Context.Tag<any, any>
-  },
-  R
+  }
 >(
   id: Name,
   options?: Options | undefined
-) => TagClass<Self, Name, Options, R> =>
+) => TagClass<Self, Name, Options, never> =>
 (
   id: string,
   options?: {
+    readonly wrap?: boolean
     readonly optional?: boolean
     readonly failure?: Schema.Schema.All
     readonly provides?: Context.Tag<any, any>
@@ -210,6 +231,7 @@ export const Tag = <Self>(): <
     TagClass_.provides = options.provides
   }
   TagClass_.optional = options?.optional ?? false
+  TagClass_.wrap = options?.wrap ?? false
   return TagClass as any
 }
 
@@ -225,16 +247,26 @@ export const Tag = <Self>(): <
  * @since 1.0.0
  * @category constructors
  */
-type InferR<T> = T extends (options: any) => Effect.Effect<any, any, infer R> ? R : never
+type InferRFromImpl<Impl> = Impl extends (options: any) => Effect.Effect<any, any, infer R> ? R : never
 
-export const layer = <
+type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer S> } ? S : never
+
+export function layer<
+  M extends TagClassAnyWithProps & { readonly wrap: true },
+  Impl extends (
+    options: MiddlewareOptions & { readonly next: Effect.Effect<SuccessValue, any, ProvidedService<M>> }
+  ) => Effect.Effect<SuccessValue, any, any>
+>(tag: M, impl: Impl): Layer.Layer<Context.Tag.Identifier<M>, never, Exclude<InferRFromImpl<Impl>, ProvidedService<M>>>
+export function layer<
+  M extends TagClassAnyWithProps & { readonly wrap: false },
+  Impl extends (options: MiddlewareOptions) => Effect.Effect<ProvidedService<M>, any, any>
+>(tag: M, impl: Impl): Layer.Layer<Context.Tag.Identifier<M>, never, InferRFromImpl<Impl>>
+export function layer<
   M extends TagClassAnyWithProps,
-  T extends NextMiddleware<any, any, any>
->(
-  tag: M,
-  impl: T
-): Layer.Layer<Context.Tag.Identifier<M>, never, InferR<T>> => {
+  Impl extends (options: any) => Effect.Effect<any, any, any>
+>(tag: M, impl: Impl): Layer.Layer<Context.Tag.Identifier<M>, never, InferRFromImpl<Impl>> {
   // Read the required environment `R` at construction time to reflect it in the
   // Layer type, while still returning the concrete middleware implementation.
-  return Layer_.effect(tag, Effect_.as(Effect_.context<InferR<T>>(), impl as any))
+  // We rely on the overload signatures for the precise return `R` type.
+  return Layer_.effect(tag as any, Effect_.as(Effect_.context<any>() as any, impl as any)) as any
 }
