@@ -41,6 +41,7 @@ const AuthLive = NextMiddleware.layer(
     Effect.gen(function*() {
       const user = yield* Other
       yield* Effect.log(props)
+      // yield* Effect.fail(new Error("error"))
       return { id: "123", name: user.name }
     })
 )
@@ -81,4 +82,4 @@ const _page = Next.make(ProdLive)
     }
   )
 
-console.log(await _page({ params: { id: "abc" } }))
+console.log(await _page({ params: Promise.resolve({ id: "abc" }) }))

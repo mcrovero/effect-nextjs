@@ -251,20 +251,30 @@ type InferRFromImpl<Impl> = Impl extends (options: any) => Effect.Effect<any, an
 
 type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer S> } ? S : never
 
-export function layer<
-  M extends TagClassAnyWithProps & { readonly wrap: true },
-  Impl extends (
-    options: MiddlewareOptions & { readonly next: Effect.Effect<SuccessValue, any, ProvidedService<M>> }
-  ) => Effect.Effect<SuccessValue, any, any>
->(tag: M, impl: Impl): Layer.Layer<Context.Tag.Identifier<M>, never, Exclude<InferRFromImpl<Impl>, ProvidedService<M>>>
-export function layer<
-  M extends TagClassAnyWithProps & { readonly wrap: false },
-  Impl extends (options: MiddlewareOptions) => Effect.Effect<ProvidedService<M>, any, any>
->(tag: M, impl: Impl): Layer.Layer<Context.Tag.Identifier<M>, never, InferRFromImpl<Impl>>
+// Infer the error type from the tag's failure schema
+type FailureFromTag<M> = M extends { readonly failure: Schema.Schema<infer A, any, any> } ? A : never
+
+// Match TagClass.FailureService behavior: if optional, error type is unknown; otherwise use FailureFromTag
+type FailureServiceFromTag<M> = M extends { readonly optional: true } ? unknown : FailureFromTag<M>
+
 export function layer<
   M extends TagClassAnyWithProps,
-  Impl extends (options: any) => Effect.Effect<any, any, any>
->(tag: M, impl: Impl): Layer.Layer<Context.Tag.Identifier<M>, never, InferRFromImpl<Impl>> {
+  Impl extends (
+    options:
+      & MiddlewareOptions
+      & (
+        M["wrap"] extends true ? { readonly next: Effect.Effect<SuccessValue, FailureFromTag<M>, ProvidedService<M>> }
+          : unknown
+      )
+  ) => Effect.Effect<
+    M["wrap"] extends true ? SuccessValue : ProvidedService<M>,
+    FailureServiceFromTag<M>,
+    InferRFromImpl<Impl>
+  >
+>(
+  tag: M,
+  impl: Impl
+): Layer.Layer<Context.Tag.Identifier<M>, never, Exclude<InferRFromImpl<Impl>, ProvidedService<M>>> {
   // Read the required environment `R` at construction time to reflect it in the
   // Layer type, while still returning the concrete middleware implementation.
   // We rely on the overload signatures for the precise return `R` type.
