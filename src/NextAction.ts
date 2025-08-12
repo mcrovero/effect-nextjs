@@ -82,7 +82,7 @@ export interface NextAction<
   ): (
     input: Input<NextAction<Tag, L, Middleware, InputA>>
   ) => Promise<
-    | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
+    | (ReturnType<InnerHandler> extends Promise<Effect<infer _A, any, any>> ? _A : never)
     | OnError
   >
 }
