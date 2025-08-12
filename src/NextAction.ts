@@ -8,7 +8,7 @@ import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
 import * as Schema_ from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
-import type { NextMiddleware } from "./index.js"
+import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
  * @since 1.0.0
