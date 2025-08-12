@@ -72,14 +72,19 @@ export interface NextAction<
   setInputSchema<S extends AnySchema>(schema: S): NextAction<Tag, L, Middleware, S["Type"]>
 
   run<
-    InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>
+    InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>,
+    OnError = never
   >(
-    build: InnerHandler
+    build: InnerHandler,
+    onError?: (
+      error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
+    ) => OnError
   ): (
     input?: Input<NextAction<Tag, L, Middleware, InputA>>
   ) => Effect<
-    ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never,
-    any,
+    | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
+    | OnError,
+    never,
     never
   >
 }
@@ -118,7 +123,8 @@ const Proto = {
 
   run(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>
+    build: (ctx: any) => Effect<any, any, any>,
+    onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -160,7 +166,10 @@ const Proto = {
         return yield* handlerEffect
       }).pipe(Effect_.provide(layer))
 
-      return program as Effect<any, any, never>
+      return Effect_.matchEffect(program as Effect<any, any, never>, {
+        onFailure: (error) => Effect_.succeed(onError ? onError(error) : error),
+        onSuccess: (value) => Effect_.succeed(value)
+      }) as any
     }
   }
 }
@@ -268,3 +277,14 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 export type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
   InputA extends undefined ? unknown : InputA
   : never
+
+// Error typing helpers for run onError
+type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
+
+export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>
+  : never
+
+export type HandlerError<H> = H extends (
+  ...args: any
+) => Effect<infer _A, infer _E, any> ? _E :
+  never

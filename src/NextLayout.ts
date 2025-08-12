@@ -72,16 +72,21 @@ export interface NextLayout<
   setParamsSchema<S extends AnySchema>(schema: S): NextLayout<Tag, L, Middleware, S["Type"]>
 
   run<
-    InnerHandler extends HandlerFrom<NextLayout<Tag, L, Middleware, ParamsA>>
+    InnerHandler extends HandlerFrom<NextLayout<Tag, L, Middleware, ParamsA>>,
+    OnError = never
   >(
-    build: InnerHandler
+    build: InnerHandler,
+    onError?: (
+      error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
+    ) => OnError
   ): (
     props?: {
-      readonly params?: Promise<Record<string, string>> | Record<string, string>
+      readonly params?: Promise<Record<string, string>>
       readonly children?: any
     }
   ) => Promise<
-    ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never
+    | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
+    | OnError
   >
 }
 
@@ -118,26 +123,24 @@ const Proto = {
 
   run(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>
+    build: (ctx: any) => Effect<any, any, any>,
+    onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
     const paramsSchema = this.paramsSchema
     return (props?: {
-      readonly params?: Promise<Record<string, string>> | Record<string, string>
+      readonly params?: Promise<Record<string, string>>
       readonly children?: any
     }) => {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const payload = yield* Effect_.gen(function*() {
-          const rawParams = props?.params
-            ? (typeof (props.params as any)?.then === "function" && paramsSchema
-              ? yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
-              : props.params)
-            : undefined
-          const decodedParams = paramsSchema && rawParams !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
-            : rawParams
+          const decodedParams = paramsSchema && props?.params !== undefined
+            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(
+              yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
+            )
+            : props?.params
           const children = props?.children
           return { params: decodedParams, children }
         })
@@ -173,18 +176,25 @@ const Proto = {
        */
       return Effect_.runPromiseExit(program as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
-          const mappedError = Cause.match<any | Error, any>(result.cause, {
-            onEmpty: new Error("empty"),
-            onFail: (error) => {
-              return error
+          const mappedError = Cause.match<any, any>(result.cause, {
+            onEmpty: () => {
+              throw new Error("empty")
             },
-            onDie: (defect) => {
-              return defect
+            onFail: (error) => error,
+            onDie: (defect) => defect,
+            onInterrupt: (fiberId) => {
+              throw new Error(`Interrupted`, { cause: fiberId })
             },
-            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
-            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
-            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
+            onSequential: (left, right) => {
+              throw new Error(`Sequential (left: ${left}) (right: ${right})`)
+            },
+            onParallel: (left, right) => {
+              throw new Error(`Parallel (left: ${left}) (right: ${right})`)
+            }
           })
+          if (onError) {
+            return onError(mappedError) as any
+          }
           throw mappedError
         }
         return result.value
@@ -297,3 +307,14 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer ParamsA> ?
   ParamsA extends undefined ? Promise<Record<string, string>> : ParamsA
   : never
+
+// Error typing helpers for run onError
+type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
+
+export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>
+  : never
+
+export type HandlerError<H> = H extends (
+  ...args: any
+) => Effect<infer _A, infer _E, any> ? _E :
+  never

@@ -57,8 +57,11 @@ const _page = Next.make(ProdLive).page("HomePage")
   .run(({ params }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
+      yield* Effect.fail("error")
       return { user, params }
-    })
-  )
+    }), (error) => {
+    console.log(error)
+    return { error: "error" }
+  })
 
-console.log(await _page({ params: { id: "abc" } }))
+console.log(await _page({ params: Promise.resolve({ id: "abc" }) }))

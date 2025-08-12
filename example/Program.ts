@@ -57,20 +57,28 @@ const OtherLive = Layer.effect(
 
 const ProdLive = Layer.mergeAll(AuthLive.pipe(Layer.provide(OtherLive)), OtherLive)
 
-const _page = Next.make(ProdLive).page("HomePage")
-  .setParamsSchema(Schema.Struct({
-    id: Schema.String
-  }))
+const _page = Next.make(ProdLive)
+  .page("HomePage")
+  .setParamsSchema(
+    Schema.Struct({
+      id: Schema.String
+    })
+  )
   // .setSearchParamsSchema(Schema.Struct({
   //   id: Schema.String
   // }))
   .middleware(AuthMiddleware)
-  .run(({ params }) =>
-    Effect.gen(function*() {
-      const user = yield* CurrentUser
-      const other = yield* Other
-      return { user, other, params }
-    })
+  .run(
+    ({ params }) =>
+      Effect.gen(function*() {
+        const user = yield* CurrentUser
+        const other = yield* Other
+        return { user, other, params }
+      }),
+    (error) => {
+      console.log(error)
+      return { error: "error" }
+    }
   )
 
 console.log(await _page({ params: { id: "abc" } }))
