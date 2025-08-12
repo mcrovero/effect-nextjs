@@ -3,6 +3,9 @@
  */
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
+import * as Effect_ from "effect/Effect"
+import type * as Layer from "effect/Layer"
+import * as Layer_ from "effect/Layer"
 import * as Schema from "effect/Schema"
 import type { Mutable } from "effect/Types"
 
@@ -42,16 +45,6 @@ export interface NextMiddleware<Provides, E, R> {
  * @since 1.0.0
  * @category models
  */
-export interface NextMiddlewareWrap<Provides, E, R> {
-  (
-    options: MiddlewareOptions & { readonly next: Effect.Effect<SuccessValue, E, Provides> }
-  ): Effect.Effect<SuccessValue, E, R>
-}
-
-/**
- * @since 1.0.0
- * @category models
- */
 export interface SuccessValue {
   readonly _: unique symbol
 }
@@ -72,8 +65,7 @@ export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
   Self,
   Name,
   Options,
-  TagClass.Wrap<Options> extends true ? NextMiddlewareWrap<TagClass.Provides<Options>, TagClass.Failure<Options>, R>
-    : NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>, R>
+  NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>, R>
 >
 
 /**
@@ -142,19 +134,12 @@ export declare namespace TagClass {
    * @since 1.0.0
    * @category models
    */
-  export type Wrap<Options> = Options extends { readonly wrap: true } ? true : false
-
-  /**
-   * @since 1.0.0
-   * @category models
-   */
   export interface Base<Self, Name extends string, Options, Service> extends Context.Tag<Self, Service> {
     new(_: never): Context.TagClassShape<Name, Service>
     readonly [TypeId]: TypeId
     readonly optional: Optional<Options>
     readonly failure: FailureSchema<Options>
     readonly provides: Options extends { readonly provides: Context.Tag<any, any> } ? Options["provides"] : undefined
-    readonly wrap: Wrap<Options>
   }
 }
 
@@ -167,21 +152,17 @@ export interface TagClassAny extends Context.Tag<any, any> {
   readonly optional: boolean
   readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
-  readonly wrap: boolean
 }
 
 /**
  * @since 1.0.0
  * @category models
  */
-export interface TagClassAnyWithProps
-  extends Context.Tag<any, NextMiddleware<any, any, any> | NextMiddlewareWrap<any, any, any>>
-{
+export interface TagClassAnyWithProps extends Context.Tag<any, NextMiddleware<any, any, any>> {
   readonly [TypeId]: TypeId
   readonly optional: boolean
   readonly provides?: Context.Tag<any, any>
   readonly failure: Schema.Schema.All
-  readonly wrap: boolean
 }
 
 /**
@@ -191,7 +172,6 @@ export interface TagClassAnyWithProps
 export const Tag = <Self>(): <
   const Name extends string,
   const Options extends {
-    readonly wrap?: boolean
     readonly optional?: boolean
     readonly failure?: Schema.Schema.All
     readonly provides?: Context.Tag<any, any>
@@ -207,7 +187,6 @@ export const Tag = <Self>(): <
     readonly optional?: boolean
     readonly failure?: Schema.Schema.All
     readonly provides?: Context.Tag<any, any>
-    readonly wrap?: boolean
   }
 ) => {
   const Err = globalThis.Error as any
@@ -231,6 +210,31 @@ export const Tag = <Self>(): <
     TagClass_.provides = options.provides
   }
   TagClass_.optional = options?.optional ?? false
-  TagClass_.wrap = options?.wrap ?? false
   return TagClass as any
+}
+
+/**
+ * Create a Layer for a middleware implementation that accurately carries the
+ * runtime environment requirements of the middleware into the Layer's R.
+ *
+ * This ensures that, if your middleware implementation yields from other
+ * services (e.g. `yield* Other`), the resulting Layer type will reflect that
+ * requirement, e.g. `Layer.Layer<AuthMiddleware, never, Other>` instead of
+ * `never`.
+ *
+ * @since 1.0.0
+ * @category constructors
+ */
+type InferR<T> = T extends (options: any) => Effect.Effect<any, any, infer R> ? R : never
+
+export const layer = <
+  M extends TagClassAnyWithProps,
+  T extends NextMiddleware<any, any, any>
+>(
+  tag: M,
+  impl: T
+): Layer.Layer<Context.Tag.Identifier<M>, never, InferR<T>> => {
+  // Read the required environment `R` at construction time to reflect it in the
+  // Layer type, while still returning the concrete middleware implementation.
+  return Layer_.effect(tag, Effect_.as(Effect_.context<InferR<T>>(), impl as any))
 }
