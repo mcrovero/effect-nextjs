@@ -14,7 +14,7 @@ import type { NextMiddleware } from "./index.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-next/Action")
+export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-nextjs/Action")
 
 /**
  * @since 1.0.0
@@ -187,7 +187,7 @@ const makeProto = <
   function NextAction() {}
   Object.setPrototypeOf(NextAction, Proto)
   Object.assign(NextAction, options)
-  NextAction.key = `@mattiacrovero/effect-next/NextAction/${options._tag}`
+  NextAction.key = `@mattiacrovero/effect-nextjs/NextAction/${options._tag}`
   return NextAction as any
 }
 

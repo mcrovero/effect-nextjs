@@ -5,12 +5,13 @@ on:
     branches: [main, next-minor, next-major]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   snapshot:
     name: Snapshot
-    if: github.repository_owner == 'Effect-Ts'
+    if: github.repository_owner == 'mcrovero'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

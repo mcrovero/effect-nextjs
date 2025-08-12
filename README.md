@@ -1,4 +1,4 @@
-### @mattiacrovero/effect-next
+### @mattiacrovero/effect-nextjs
 
 Typed helpers to build Next.js App Router pages, layouts, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and run your `Effect` programs with a single call.
 
@@ -7,7 +7,7 @@ Typed helpers to build Next.js App Router pages, layouts, and server actions wit
 1. Install
 
 ```sh
-pnpm add @mattiacrovero/effect-next effect next
+pnpm add @mattiacrovero/effect-nextjs effect next
 ```
 
 2. Define a service and a middleware
@@ -17,7 +17,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mattiacrovero/effect-next"
+import { Next, NextMiddleware } from "@mattiacrovero/effect-nextjs"
 
 // A simple service
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -91,7 +91,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mattiacrovero/effect-next"
+import { Next, NextMiddleware } from "@mattiacrovero/effect-nextjs"
 
 // Dependencies
 export class Other extends Context.Tag("Other")<Other, { id: string; name: string }>() {}
@@ -153,7 +153,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mattiacrovero/effect-next"
+import { Next, NextMiddleware } from "@mattiacrovero/effect-nextjs"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
@@ -188,7 +188,7 @@ Use `Schema` to validate/transform values automatically before your handler runs
 
 ```ts
 import * as Schema from "effect/Schema"
-import { Next } from "@mattiacrovero/effect-next"
+import { Next } from "@mattiacrovero/effect-nextjs"
 
 // Params and searchParams (Page)
 const page = Next.make(AppLive)

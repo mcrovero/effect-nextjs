@@ -48,7 +48,7 @@ describe("Program integration", () => {
       .middleware(OtherMiddleware)
 
     // Asserts spanning modules
-    expect(page.key).toBe("@mattiacrovero/effect-next/NextPage/HomePage")
+    expect(page.key).toBe("@mattiacrovero/effect-nextjs/NextPage/HomePage")
     expect(page.layer).toBe(combined)
     const mws = [...page.middlewares]
     expect(mws).toContain(AuthMiddleware)

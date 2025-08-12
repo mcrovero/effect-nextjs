@@ -11,7 +11,7 @@ permissions: {}
 
 jobs:
   release:
-    if: github.repository_owner == 'Effect-Ts'
+    if: github.repository_owner == 'mcrovero'
     name: Release
     runs-on: ubuntu-latest
     timeout-minutes: 10

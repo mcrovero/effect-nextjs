@@ -14,7 +14,7 @@ import type { NextMiddleware } from "./index.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-next/Layout")
+export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-nextjs/Layout")
 
 /**
  * @since 1.0.0
@@ -216,7 +216,7 @@ const makeProto = <
   function NextLayout() {}
   Object.setPrototypeOf(NextLayout, Proto)
   Object.assign(NextLayout, options)
-  NextLayout.key = `@mattiacrovero/effect-next/NextLayout/${options._tag}`
+  NextLayout.key = `@mattiacrovero/effect-nextjs/NextLayout/${options._tag}`
   return NextLayout as any
 }
 

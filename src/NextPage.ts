@@ -15,7 +15,7 @@ import type { NextMiddleware } from "./index.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-next/Rpc")
+export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-nextjs/Rpc")
 
 /**
  * @since 1.0.0
@@ -243,7 +243,7 @@ const makeProto = <
   function NextPage() {}
   Object.setPrototypeOf(NextPage, Proto)
   Object.assign(NextPage, options)
-  NextPage.key = `@mattiacrovero/effect-next/NextPage/${options._tag}`
+  NextPage.key = `@mattiacrovero/effect-nextjs/NextPage/${options._tag}`
   return NextPage as any
 }
 
