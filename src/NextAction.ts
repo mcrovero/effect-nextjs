@@ -80,12 +80,10 @@ export interface NextAction<
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
   ): (
-    input?: Input<NextAction<Tag, L, Middleware, InputA>>
-  ) => Effect<
+    input: Input<NextAction<Tag, L, Middleware, InputA>>
+  ) => Promise<
     | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
-    | OnError,
-    never,
-    never
+    | OnError
   >
 }
 
@@ -129,7 +127,7 @@ const Proto = {
     const middlewares = this.middlewares
     const layer = this.layer
     const inputSchema = this.inputSchema
-    return (inputArg?: unknown) => {
+    return (inputArg: unknown) => {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const payload = yield* Effect_.gen(function*() {
@@ -166,10 +164,12 @@ const Proto = {
         return yield* handlerEffect
       }).pipe(Effect_.provide(layer))
 
-      return Effect_.matchEffect(program as Effect<any, any, never>, {
+      const handled = Effect_.matchEffect(program as Effect<any, any, never>, {
         onFailure: (error) => Effect_.succeed(onError ? onError(error) : error),
         onSuccess: (value) => Effect_.succeed(value)
-      }) as any
+      })
+
+      return Effect_.runPromise(handled as Effect<any, never, never>)
     }
   }
 }

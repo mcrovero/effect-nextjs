@@ -3,7 +3,8 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "<PLACEHOLDER>"
+      "repo": "mcrovero/effect-nextjs",
+      "access": "public"
     }
   ],
   "commit": false,
