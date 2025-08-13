@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import * as NextServerComponent from "../src/NextServerComponent.js"
+import type * as NextServerComponent from "../src/NextServerComponent.js"
 
 describe("NextServerComponent", () => {
   class ServerTime extends Context.Tag("ServerTime")<ServerTime, { now: number }>() {}
@@ -44,5 +44,3 @@ describe("NextServerComponent", () => {
     expect(result.time.now).toBeTypeOf("number")
   })
 })
-
-

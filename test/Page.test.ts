@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import * as NextPage from "../src/NextPage.js"
+import type * as NextPage from "../src/NextPage.js"
 
 describe("NextPage", () => {
   class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -44,8 +44,12 @@ describe("NextPage", () => {
     expect(mws).toContain(AuthMiddleware)
     expect(mws).toContain(OtherMiddleware)
 
-    expectTypeOf<NextPage.Params<typeof page>>().toEqualTypeOf<{ id: string }>()
-    expectTypeOf<NextPage.SearchParams<typeof page>>().toEqualTypeOf<{ q: string }>()
+    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toEqualTypeOf<{ id: string }>(
+      undefined as any
+    )
+    expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toEqualTypeOf<{ q: string }>(
+      undefined as any
+    )
   })
 
   it("runs handler with provided services and decoded params", async () => {
@@ -73,5 +77,3 @@ describe("NextPage", () => {
     })
   })
 })
-
-

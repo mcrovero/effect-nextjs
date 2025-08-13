@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import * as Next from "../src/Next.js"
-import * as NextLayout from "../src/NextLayout.js"
+import type * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("NextLayout", () => {
@@ -28,7 +28,9 @@ describe("NextLayout", () => {
     expect(layout.key).toBe("@mattiacrovero/effect-nextjs/NextLayout/Root")
     const mws = [...layout.middlewares]
     expect(mws).toContain(ThemeMiddleware)
-    expectTypeOf<NextLayout.Params<typeof layout>>().toEqualTypeOf<{ locale: string }>()
+    expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toEqualTypeOf<{ locale: string }>(
+      undefined as any
+    )
   })
 
   it("runs handler with provided services and decoded params", async () => {
@@ -37,7 +39,7 @@ describe("NextLayout", () => {
       .setParamsSchema(Schema.Struct({ locale: Schema.String }))
       .middleware(ThemeMiddleware)
 
-    const result = await layout.run(({ params, children }) =>
+    const result = await layout.run(({ children, params }) =>
       Effect.gen(function*() {
         const theme = yield* Theme
         return { theme, params, children }
@@ -47,5 +49,3 @@ describe("NextLayout", () => {
     expect(result).toEqual({ theme: { mode: "dark" }, params: { locale: "en" }, children: "child" })
   })
 })
-
-

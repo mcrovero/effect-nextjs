@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import * as Next from "../src/Next.js"
-import * as NextAction from "../src/NextAction.js"
+import type * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("NextAction", () => {
@@ -28,7 +28,9 @@ describe("NextAction", () => {
     expect(action.key).toBe("@mattiacrovero/effect-nextjs/NextAction/Submit")
     const mws = [...action.middlewares]
     expect(mws).toContain(AuthMiddleware)
-    expectTypeOf<NextAction.HandlerInput<typeof action>>().toEqualTypeOf<{ id: number }>()
+    expectTypeOf<NextAction.HandlerInput<typeof action>>(undefined as any).toEqualTypeOf<{ id: number }>(
+      undefined as any
+    )
   })
 
   it("runs handler with provided services and decoded input", async () => {
@@ -47,5 +49,3 @@ describe("NextAction", () => {
     expect(result).toEqual({ user: { id: "123", name: "John Doe" }, input: { id: 1 } })
   })
 })
-
-

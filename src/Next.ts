@@ -5,8 +5,8 @@ import type * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 import * as NextAction from "./NextAction.js"
 import * as NextLayout from "./NextLayout.js"
-import * as NextServerComponent from "./NextServerComponent.js"
 import * as NextPage from "./NextPage.js"
+import * as NextServerComponent from "./NextServerComponent.js"
 
 /**
  * @since 1.0.0
