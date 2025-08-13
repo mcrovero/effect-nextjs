@@ -38,7 +38,7 @@ describe("NextPage", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    expect(page.key).toBe("@mattiacrovero/effect-nextjs/NextPage/Home")
+    expect(page.key).toBe("@mcrovero/effect-nextjs/NextPage/Home")
     expect(page.layer).toBe(combined)
     const mws = [...page.middlewares]
     expect(mws).toContain(AuthMiddleware)

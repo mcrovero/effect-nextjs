@@ -12,7 +12,7 @@ import type * as NextMiddleware from "./NextMiddleware.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mattiacrovero/effect-nextjs/ServerComponent")
+export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/ServerComponent")
 
 /**
  * @since 1.0.0
@@ -171,7 +171,7 @@ const makeProto = <
   function NextServerComponent() {}
   Object.setPrototypeOf(NextServerComponent, Proto)
   Object.assign(NextServerComponent, options)
-  NextServerComponent.key = `@mattiacrovero/effect-nextjs/NextServerComponent/${options._tag}`
+  NextServerComponent.key = `@mcrovero/effect-nextjs/NextServerComponent/${options._tag}`
   return NextServerComponent as any
 }
 

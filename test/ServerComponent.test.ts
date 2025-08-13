@@ -23,7 +23,7 @@ describe("NextServerComponent", () => {
       .component("ServerInfo")
       .middleware(TimeMiddleware)
 
-    expect(component.key).toBe("@mattiacrovero/effect-nextjs/NextServerComponent/ServerInfo")
+    expect(component.key).toBe("@mcrovero/effect-nextjs/NextServerComponent/ServerInfo")
     const mws = [...component.middlewares]
     expect(mws).toContain(TimeMiddleware)
     expectTypeOf<NextServerComponent.HandlerFrom<typeof component>>()

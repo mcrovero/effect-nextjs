@@ -1,5 +1,5 @@
 {
-  "name": "@mattiacrovero/effect-nextjs",
+  "name": "@mcrovero/effect-nextjs",
   "version": "0.0.1",
   "type": "module",
   "packageManager": "pnpm@9.10.0",

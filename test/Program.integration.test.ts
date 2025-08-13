@@ -48,7 +48,7 @@ describe("Program integration", () => {
       .middleware(OtherMiddleware)
 
     // Asserts spanning modules
-    expect(page.key).toBe("@mattiacrovero/effect-nextjs/NextPage/HomePage")
+    expect(page.key).toBe("@mcrovero/effect-nextjs/NextPage/HomePage")
     expect(page.layer).toBe(combined)
     const mws = [...page.middlewares]
     expect(mws).toContain(AuthMiddleware)
@@ -88,7 +88,7 @@ describe("Program integration", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    expect(layout.key).toBe("@mattiacrovero/effect-nextjs/NextLayout/RootLayout")
+    expect(layout.key).toBe("@mcrovero/effect-nextjs/NextLayout/RootLayout")
     expect(layout.layer).toBe(combined)
     const mws = [...layout.middlewares]
     expect(mws).toContain(AuthMiddleware)
@@ -102,7 +102,7 @@ describe("Program integration", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    expect(action.key).toBe("@mattiacrovero/effect-nextjs/NextAction/DoSomething")
+    expect(action.key).toBe("@mcrovero/effect-nextjs/NextAction/DoSomething")
     expect(action.layer).toBe(combined)
     const mws = [...action.middlewares]
     expect(mws).toContain(AuthMiddleware)
@@ -116,7 +116,7 @@ describe("Program integration", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    expect(component.key).toBe("@mattiacrovero/effect-nextjs/NextServerComponent/ServerInfo")
+    expect(component.key).toBe("@mcrovero/effect-nextjs/NextServerComponent/ServerInfo")
     expect(component.layer).toBe(combined)
     const mws = [...component.middlewares]
     expect(mws).toContain(AuthMiddleware)

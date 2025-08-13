@@ -25,7 +25,7 @@ describe("NextLayout", () => {
       .setParamsSchema(Schema.Struct({ locale: Schema.String }))
       .middleware(ThemeMiddleware)
 
-    expect(layout.key).toBe("@mattiacrovero/effect-nextjs/NextLayout/Root")
+    expect(layout.key).toBe("@mcrovero/effect-nextjs/NextLayout/Root")
     const mws = [...layout.middlewares]
     expect(mws).toContain(ThemeMiddleware)
     expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toEqualTypeOf<{ locale: string }>(
