@@ -1,6 +1,10 @@
-### @mcrovero/effect-nextjs
+# @mcrovero/effect-nextjs
 
-**Alpha warning**: This library is in early alpha and is not ready for production use.
+[![npm version](https://img.shields.io/npm/v/%40mcrovero%2Feffect-nextjs.svg?logo=npm&label=npm)](https://www.npmjs.com/package/@mcrovero/effect-nextjs)
+[![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+> [!WARNING]
+> This library is in early alpha and is not ready for production use.
 
 Typed helpers to build Next.js App Router pages, layouts, server components, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
 
