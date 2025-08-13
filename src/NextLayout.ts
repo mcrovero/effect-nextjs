@@ -43,7 +43,7 @@ export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
-  readonly middlewares: ReadonlySet<NextMiddleware.TagClassAnyWithProps>
+  readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly layer: Layer.Layer<any, any, any>
   readonly paramsSchema?: AnySchema
 }
@@ -61,7 +61,7 @@ export interface NextLayout<
   readonly [TypeId]: TypeId
   readonly _tag: Tag
   readonly key: string
-  readonly middlewares: ReadonlySet<Middleware>
+  readonly middlewares: ReadonlyArray<Middleware>
   readonly layer: L
   readonly paramsSchema?: AnySchema
 
@@ -94,7 +94,7 @@ export interface Any extends Pipeable {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
-  readonly middlewares: ReadonlySet<NextMiddleware.TagClassAny>
+  readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAny>
   readonly layer: Layer.Layer<any, any, any>
   readonly paramsSchema?: AnySchema
 }
@@ -108,7 +108,7 @@ const Proto = {
     return makeProto({
       _tag: this._tag,
       layer: this.layer,
-      middlewares: new Set([...this.middlewares, middleware])
+      middlewares: [...this.middlewares, middleware]
     })
   },
   setParamsSchema(this: AnyWithProps, schema: AnySchema) {
@@ -145,28 +145,32 @@ const Proto = {
           return { params: decodedParams, children }
         })
         let handlerEffect = build(payload as any) as Effect<any, any, any>
-        if (middlewares.size > 0) {
-          const options = { _type: "layout", params: props?.params, children: props?.children }
-          for (const tag of middlewares) {
-            if (tag.wrap) {
-              const middleware = Context.unsafeGet(context, tag) as any
-              handlerEffect = middleware({ ...options, next: handlerEffect }) as any
-            } else if (tag.optional) {
-              const middleware = Context.unsafeGet(context, tag) as any
-              const previous = handlerEffect
-              handlerEffect = Effect_.matchEffect(middleware(options), {
-                onFailure: () => previous,
-                onSuccess: tag.provides !== undefined
-                  ? (value) => Effect_.provideService(previous, tag.provides as any, value)
-                  : () => previous
-              })
-            } else {
-              const middleware = Context.unsafeGet(context, tag) as any
-              handlerEffect = tag.provides !== undefined
-                ? Effect_.provideServiceEffect(handlerEffect, tag.provides as any, middleware(options))
-                : Effect_.zipRight(middleware(options), handlerEffect)
+        if (middlewares.length > 0) {
+          const options = { _type: "layout" as const, params: props?.params, children: props?.children }
+          const tags = middlewares as ReadonlyArray<any>
+          const buildChain = (index: number): Effect<any, any, any> => {
+            if (index >= tags.length) {
+              return handlerEffect
             }
+            const tag = tags[index] as any
+            const middleware = Context.unsafeGet(context, tag) as any
+            const tail = buildChain(index + 1)
+            if (tag.wrap) {
+              return middleware({ ...options, next: tail }) as any
+            }
+            if (tag.optional) {
+              return Effect_.matchEffect(middleware(options), {
+                onFailure: () => tail,
+                onSuccess: tag.provides !== undefined
+                  ? (value: any) => Effect_.provideService(tail, tag.provides as any, value)
+                  : () => tail
+              })
+            }
+            return tag.provides !== undefined
+              ? Effect_.provideServiceEffect(tail, tag.provides as any, middleware(options))
+              : Effect_.zipRight(middleware(options), tail)
           }
+          handlerEffect = buildChain(0)
         }
         return yield* handlerEffect
       }).pipe(Effect_.provide(layer))
@@ -210,7 +214,7 @@ const makeProto = <
 >(options: {
   readonly _tag: Tag
   readonly layer: L
-  readonly middlewares: ReadonlySet<Middleware>
+  readonly middlewares: ReadonlyArray<Middleware>
   readonly paramsSchema?: AnySchema
 }): NextLayout<Tag, L, Middleware> => {
   function NextLayout() {}
@@ -234,7 +238,7 @@ export const make = <
   return makeProto({
     _tag: tag,
     layer,
-    middlewares: new Set<never>()
+    middlewares: [] as Array<never>
   }) as any
 }
 
