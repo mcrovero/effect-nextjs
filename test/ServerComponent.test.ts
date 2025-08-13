@@ -34,7 +34,7 @@ describe("NextServerComponent", () => {
       .component("ServerInfo")
       .middleware(TimeMiddleware)
 
-    const result = await component.run(() =>
+    const result = await component.build(() =>
       Effect.gen(function*() {
         const time = yield* ServerTime
         return { time }

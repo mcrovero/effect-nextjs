@@ -57,11 +57,11 @@ export interface NextAction<
 
   setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
 
-  run<
+  build<
     InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>,
     OnError = never
   >(
-    build: InnerHandler,
+    handler: InnerHandler,
     onError?: (
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
@@ -105,9 +105,9 @@ const Proto = {
     return makeProto(options)
   },
 
-  run(
+  build(
     this: AnyWithProps,
-    build: (ctx: any) => Promise<Effect<any, any, any>>,
+    handler: (ctx: any) => Promise<Effect<any, any, any>>,
     onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
@@ -123,7 +123,7 @@ const Proto = {
             : rawInput
           return { input: decodedInput }
         })
-        let handlerEffect = yield* Effect_.promise(() => build(payload as any))
+        let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
         if (middlewares.length > 0) {
           const options = { _type: "action" as const, input: (payload as any).input }
           const tags = middlewares as ReadonlyArray<any>
@@ -302,7 +302,7 @@ export type HandlerInput<P extends Any> = P extends
   InputA extends Schema.Schema<infer encoded, infer _decoded, infer _c> ? encoded : unknown
   : never
 
-// Error typing helpers for run onError
+// Error typing helpers for build onError
 type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>
   : never

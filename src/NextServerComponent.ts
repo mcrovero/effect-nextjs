@@ -51,11 +51,11 @@ export interface NextServerComponent<
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextServerComponent<Tag, L, Middleware | M>
 
-  run<
+  build<
     InnerHandler extends HandlerFrom<NextServerComponent<Tag, L, Middleware>>,
     OnError = never
   >(
-    build: InnerHandler,
+    handler: InnerHandler,
     onError?: (
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
@@ -86,9 +86,9 @@ const Proto = {
     })
   },
 
-  run(
+  build(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>,
+    handler: (ctx: any) => Effect<any, any, any>,
     onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
@@ -96,7 +96,7 @@ const Proto = {
     return () => {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        let handlerEffect = build(undefined as any) as Effect<any, any, any>
+        let handlerEffect = handler(undefined as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
           const options = { _type: "component" as const }
           const tags = middlewares as ReadonlyArray<any>
@@ -246,6 +246,6 @@ export type ToHandler<R extends Any> = R extends NextServerComponent<infer _Tag,
  */
 export type ToHandlerFn<R extends Any> = () => Effect<any, any, ExtractProvides<R>>
 
-// Error typing helpers for run onError
+// Error typing helpers for build onError
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? Schema.Schema.Type<M["failure"]> : never
 export type HandlerError<H> = H extends (...args: any) => Effect<infer _A, infer _E, any> ? _E : never

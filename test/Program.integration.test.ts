@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
-// Mirrors example/Program.ts, but as an integration test without invoking run()
+// Mirrors example/Program.ts, but as an integration test without invoking build()
 describe("Program integration", () => {
   // Context tags
   class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -67,7 +67,7 @@ describe("Program integration", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    const result = await page.run(() =>
+    const result = await page.build(() =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
         const other = yield* Other

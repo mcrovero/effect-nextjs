@@ -54,7 +54,7 @@ const _page = Next.make(ProdLive).page("HomePage")
   // }))
   .middleware(WrappedMiddleware)
   .middleware(NotWrappedMiddleware)
-  .run(({ params }) =>
+  .build(({ params }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
       yield* Effect.fail("error")

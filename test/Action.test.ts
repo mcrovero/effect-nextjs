@@ -39,7 +39,7 @@ describe("NextAction", () => {
       .setInputSchema(Schema.Struct({ id: Schema.Number }))
       .middleware(AuthMiddleware)
 
-    const result = await action.run(async ({ input }) =>
+    const result = await action.build(async ({ input }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
         return { user, input }

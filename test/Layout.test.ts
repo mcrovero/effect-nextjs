@@ -39,7 +39,7 @@ describe("NextLayout", () => {
       .setParamsSchema(Schema.Struct({ locale: Schema.String }))
       .middleware(ThemeMiddleware)
 
-    const result = await layout.run(({ children, params }) =>
+    const result = await layout.build(({ children, params }) =>
       Effect.gen(function*() {
         const theme = yield* Theme
         return { theme, params, children }

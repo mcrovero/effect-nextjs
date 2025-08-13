@@ -19,7 +19,7 @@ const TimeLive = Layer.succeed(
 const component = Next.make(TimeLive)
   .component("ServerInfo")
   .middleware(TimeMiddleware)
-  .run(() =>
+  .build(() =>
     Effect.gen(function*() {
       const time = yield* ServerTime
       return { time }
