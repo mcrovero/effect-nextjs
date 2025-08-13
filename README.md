@@ -1,4 +1,4 @@
-### @mattiacrovero/effect-nextjs
+### @mcrovero/effect-nextjs
 
 **Alpha warning**: This library is in early alpha and is not ready for production use.
 
@@ -9,7 +9,7 @@ Typed helpers to build Next.js App Router pages, layouts, server components, and
 1. Install
 
 ```sh
-pnpm add @mattiacrovero/effect-nextjs effect next
+pnpm add @mcrovero/effect-nextjs effect next
 ```
 
 2. Define a service and a middleware
@@ -19,7 +19,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mattiacrovero/effect-nextjs"
+import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // A simple service
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -94,7 +94,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mattiacrovero/effect-nextjs"
+import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // Dependencies
 export class Other extends Context.Tag("Other")<Other, { id: string; name: string }>() {}
@@ -156,7 +156,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mattiacrovero/effect-nextjs"
+import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
@@ -194,7 +194,7 @@ import { makeExternalSpan } from "@effect/opentelemetry/Tracer"
 import { trace } from "@opentelemetry/api"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { NextMiddleware } from "@mattiacrovero/effect-nextjs"
+import { NextMiddleware } from "@mcrovero/effect-nextjs"
 
 export class OtelSpanMiddleware extends NextMiddleware.Tag<OtelSpanMiddleware>()("OtelSpanMiddleware", {
   wrap: true
@@ -221,7 +221,7 @@ Use `Schema` to validate/transform values automatically before your handler runs
 
 ```ts
 import * as Schema from "effect/Schema"
-import { Next } from "@mattiacrovero/effect-nextjs"
+import { Next } from "@mcrovero/effect-nextjs"
 
 // Params and searchParams (Page)
 const page = Next.make(AppLive)

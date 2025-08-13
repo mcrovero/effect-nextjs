@@ -25,7 +25,7 @@ describe("NextAction", () => {
       .setInputSchema(Schema.Struct({ id: Schema.Number }))
       .middleware(AuthMiddleware)
 
-    expect(action.key).toBe("@mattiacrovero/effect-nextjs/NextAction/Submit")
+    expect(action.key).toBe("@mcrovero/effect-nextjs/NextAction/Submit")
     const mws = [...action.middlewares]
     expect(mws).toContain(AuthMiddleware)
     expectTypeOf<NextAction.HandlerInput<typeof action>>(undefined as any).toEqualTypeOf<{ id: number }>(
