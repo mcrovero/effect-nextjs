@@ -7,6 +7,7 @@ import * as NextAction from "./NextAction.js"
 import * as NextLayout from "./NextLayout.js"
 import * as NextServerComponent from "./NextServerComponent.js"
 import * as NextPage from "./NextPage.js"
+import * as NextRoute from "./NextRoute.js"
 
 /**
  * @since 1.0.0
@@ -65,6 +66,7 @@ export interface Next<
   layout: (key: string) => NextLayout.NextLayout<string, Layer, never>
   action: (key: string) => NextAction.NextAction<string, Layer, never>
   component: (key: string) => NextServerComponent.NextServerComponent<string, Layer, never>
+  route: (key: string) => NextRoute.NextRoute<string, Layer>
 }
 
 export interface Any extends Pipeable {
@@ -89,6 +91,9 @@ const Proto = {
   },
   component(this: Any, key: string) {
     return NextServerComponent.make(key, this.layer)
+  },
+  route(this: Any, key: string) {
+    return NextRoute.make(key, this.layer)
   }
 }
 

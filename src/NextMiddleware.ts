@@ -33,6 +33,11 @@ type MiddlewareOptions = {
   readonly _type: "action"
   readonly input?: unknown
 } | {
+  readonly _type: "route"
+  readonly method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
+  readonly request: Request
+  readonly params?: Promise<Record<string, string>>
+} | {
   readonly _type: "component"
 }
 

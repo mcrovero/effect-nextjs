@@ -79,8 +79,9 @@ export default async function Page(props: {
 
 Notes
 
-- Use `.layout(tag)`, `.component(tag)`, and `.action(tag)` for layouts, server components, and server actions.
-- Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
+- Use `.layout(tag)`, `.component(tag)`, `.action(tag)`, and `.route(tag)` for layouts, server components, server actions, and API route handlers.
+- Routes: chain one of `.GET()`, `.POST()`, `.PUT()`, `.PATCH()`, `.DELETE()`, `.HEAD()`, or `.OPTIONS()` and then `.run(...)`.
+- Validate search params with `.setSearchParamsSchema(...)` on pages, action input with `.setInputSchema(...)` on actions, and route params with `.setParamsSchema(...)` on routes.
 - Add multiple middlewares with `.middleware(...)`. Middlewares can be marked `optional` or `wrap` via the tag options.
 - Provide a custom error mapping with `.run(build, onError)`.
 - Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.run(...)` for actions must be `async`, returning a Promise of an Effect.
@@ -241,6 +242,14 @@ const action = Next.make(AppLive)
 const component = Next.make(AppLive)
   .component("ServerInfo")
   .run(() => Effect.succeed({ ok: true }))
+
+// Routes (API Handlers)
+const route = Next.make(AppLive)
+  .route("Users")
+  .GET()
+  .setParamsSchema(Schema.Struct({ id: Schema.String })) // optional
+  .middleware(AuthMiddleware) // optional
+  .run(({ request, params }) => Effect.succeed(new Response(JSON.stringify({ method: request.method, params }))))
 ```
 
 ### Running Code

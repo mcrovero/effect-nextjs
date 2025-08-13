@@ -27,6 +27,9 @@ export * as NextMiddleware from "./NextMiddleware.js"
  */
 export * as NextPage from "./NextPage.js"
 
+
+export * as NextRoute from "./NextRoute.js"
+
 /**
  * @since 1.0.0
  * @category type ids
