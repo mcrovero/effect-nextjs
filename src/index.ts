@@ -15,7 +15,6 @@ export * as NextAction from "./NextAction.js"
  * @category type ids
  */
 export * as NextLayout from "./NextLayout.js"
-export * as NextServerComponent from "./NextServerComponent.js"
 
 /**
  * @since 1.0.0
@@ -27,3 +26,9 @@ export * as NextMiddleware from "./NextMiddleware.js"
  * @category type ids
  */
 export * as NextPage from "./NextPage.js"
+
+/**
+ * @since 1.0.0
+ * @category type ids
+ */
+export * as NextServerComponent from "./NextServerComponent.js"
