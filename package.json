@@ -7,7 +7,7 @@
   "description": "A library to work with Next.js in Effect",
   "repository": {
     "type": "git",
-    "url": "<PLACEHOLDER>"
+    "url": "https://github.com/mcrovero/effect-nextjs"
   },
   "publishConfig": {
     "access": "public",
