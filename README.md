@@ -55,15 +55,6 @@ export const page = Next.make(AppLive)
 // app/[id]/page.tsx
 import { page } from "@/lib/app" // wherever you defined it
 
-const page = Next.make(AppLive)
-  .page("HomePage")
-  .build(({ params }) =>
-    Effect.gen(function* () {
-      const user = yield* CurrentUser
-      return <div>Hello {user.name}</div>
-    })
-  )
-
 // Use it directly
 export default page
 
