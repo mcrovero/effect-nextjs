@@ -136,11 +136,12 @@ const Proto = {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const payload = yield* Effect_.gen(function*() {
-          const decodedParams = paramsSchema && props?.params !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(
-              yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
-            )
-            : props?.params
+          const rawParams = props?.params !== undefined
+            ? yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
+            : undefined
+          const decodedParams = paramsSchema && rawParams !== undefined
+            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
+            : rawParams
           const children = props?.children
           return { params: decodedParams, children }
         })

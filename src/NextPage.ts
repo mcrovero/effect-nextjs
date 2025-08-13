@@ -156,16 +156,18 @@ const Proto = {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const payload = yield* Effect_.gen(function*() {
-          const decodedParams = paramsSchema && props?.params !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(
-              yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
-            )
-            : props?.params
-          const decodedSearchParams = searchParamsSchema && props?.searchParams !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(searchParamsSchema)(
-              yield* Effect_.promise(() => props!.searchParams as Promise<Record<string, string>>)
-            )
-            : props?.searchParams
+          const rawParams = props?.params !== undefined
+            ? yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
+            : undefined
+          const decodedParams = paramsSchema && rawParams !== undefined
+            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
+            : rawParams
+          const rawSearchParams = props?.searchParams !== undefined
+            ? yield* Effect_.promise(() => props!.searchParams as Promise<Record<string, string>>)
+            : undefined
+          const decodedSearchParams = searchParamsSchema && rawSearchParams !== undefined
+            ? yield* (Schema_ as any).decodeUnknown(searchParamsSchema)(rawSearchParams)
+            : rawSearchParams
           return { params: decodedParams, searchParams: decodedSearchParams }
         })
         let handlerEffect = build(payload as any) as Effect<any, any, any>

@@ -80,4 +80,46 @@ describe("Program integration", () => {
       other: { id: "456", name: "Jane Doe" }
     })
   })
+
+  it("composes NextLayout and NextMiddleware as in Program example", () => {
+    const combined = Layer.mergeAll(AuthLive, OtherLive)
+    const layout = Next.make(combined)
+      .layout("RootLayout")
+      .middleware(AuthMiddleware)
+      .middleware(OtherMiddleware)
+
+    expect(layout.key).toBe("@mattiacrovero/effect-nextjs/NextLayout/RootLayout")
+    expect(layout.layer).toBe(combined)
+    const mws = [...layout.middlewares]
+    expect(mws).toContain(AuthMiddleware)
+    expect(mws).toContain(OtherMiddleware)
+  })
+
+  it("composes NextAction and NextMiddleware as in Program example", () => {
+    const combined = Layer.mergeAll(AuthLive, OtherLive)
+    const action = Next.make(combined)
+      .action("DoSomething")
+      .middleware(AuthMiddleware)
+      .middleware(OtherMiddleware)
+
+    expect(action.key).toBe("@mattiacrovero/effect-nextjs/NextAction/DoSomething")
+    expect(action.layer).toBe(combined)
+    const mws = [...action.middlewares]
+    expect(mws).toContain(AuthMiddleware)
+    expect(mws).toContain(OtherMiddleware)
+  })
+
+  it("composes NextServerComponent and NextMiddleware as in Program example", () => {
+    const combined = Layer.mergeAll(AuthLive, OtherLive)
+    const component = Next.make(combined)
+      .component("ServerInfo")
+      .middleware(AuthMiddleware)
+      .middleware(OtherMiddleware)
+
+    expect(component.key).toBe("@mattiacrovero/effect-nextjs/NextServerComponent/ServerInfo")
+    expect(component.layer).toBe(combined)
+    const mws = [...component.middlewares]
+    expect(mws).toContain(AuthMiddleware)
+    expect(mws).toContain(OtherMiddleware)
+  })
 })

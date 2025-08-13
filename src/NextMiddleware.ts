@@ -31,6 +31,9 @@ type MiddlewareOptions = {
   readonly children: unknown
 } | {
   readonly _type: "action"
+  readonly input?: unknown
+} | {
+  readonly _type: "component"
 }
 
 /**

@@ -1,6 +1,6 @@
 ### @mattiacrovero/effect-nextjs
 
-Typed helpers to build Next.js App Router pages, layouts, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and run your `Effect` programs with a single call.
+Typed helpers to build Next.js App Router pages, layouts, server components, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and run your `Effect` programs with a single call.
 
 ### Getting Started
 
@@ -77,10 +77,11 @@ export default async function Page(props: {
 
 Notes
 
-- Use `.layout(tag)` and `.action(tag)` for layouts and server actions.
+- Use `.layout(tag)`, `.component(tag)`, and `.action(tag)` for layouts, server components, and server actions.
 - Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
 - Add multiple middlewares with `.middleware(...)`. Middlewares can be marked `optional` or `wrap` via the tag options.
 - Provide a custom error mapping with `.run(build, onError)`.
+- Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.run(...)` for actions must be `async`, returning a Promise of an Effect.
 
 ### Middlewares with dependencies
 
@@ -182,6 +183,36 @@ const page = Next.make(AppLive)
   .run(() => Effect.succeed("ok"))
 ```
 
+### OpenTelemetry integration (example)
+
+You can wrap your Effect boundary with an OpenTelemetry span bridged from the currently active OTel span:
+
+```ts
+import { makeExternalSpan } from "@effect/opentelemetry/Tracer"
+import { trace } from "@opentelemetry/api"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import { NextMiddleware } from "@mattiacrovero/effect-nextjs"
+
+export class OtelSpanMiddleware extends NextMiddleware.Tag<OtelSpanMiddleware>()("OtelSpanMiddleware", {
+  wrap: true
+}) {}
+
+export const OtelSpanLive = Layer.succeed(
+  OtelSpanMiddleware,
+  OtelSpanMiddleware.of(({ next }) =>
+    Effect.sync(() => trace.getActiveSpan()).pipe(
+      Effect.flatMap((active) => {
+        if (!active) return next
+        return Effect.withSpan(next, "EffectBoundary", {
+          parent: makeExternalSpan(active.spanContext())
+        })
+      })
+    )
+  )
+)
+```
+
 ### Parsing params, searchParams and input
 
 Use `Schema` to validate/transform values automatically before your handler runs.
@@ -198,10 +229,16 @@ const page = Next.make(AppLive)
   .run(({ params, searchParams }) => Effect.succeed({ params, searchParams }))
 
 // Input (Action)
+// IMPORTANT: The action handler must be async because of Next.js server action requirements
 const action = Next.make(AppLive)
   .action("DoSomething")
   .setInputSchema(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))
-  .run(({ input }) => Effect.succeed({ ok: true, input }))
+  .run(async ({ input }) => Effect.succeed({ ok: true, input }))
+
+// Server Component (no inputs):
+const component = Next.make(AppLive)
+  .component("ServerInfo")
+  .run(() => Effect.succeed({ ok: true }))
 ```
 
 ### Running Code

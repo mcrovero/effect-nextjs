@@ -17,15 +17,17 @@ export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()(
 ) {}
 
 // Implementation for non-wrapped middleware: compute value to provide
-const _AuthLive = Layer.succeed(
+const AuthLive = Layer.succeed(
   AuthMiddleware,
   AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "other" }))
 )
 
-const _action = Next.make(_AuthLive).action("HomePage")
-  .setInputSchema(Schema.Struct({
-    id: Schema.NumberFromString
-  }))
+const action = Next.make(AuthLive).action("Submit")
+  .setInputSchema(
+    Schema.Struct({
+      id: Schema.Number
+    })
+  )
   .middleware(AuthMiddleware)
   .run(async ({ input }) =>
     Effect.gen(function*() {
@@ -33,3 +35,5 @@ const _action = Next.make(_AuthLive).action("HomePage")
       return { user, input }
     })
   )
+
+console.log(await action({ id: 123 }))

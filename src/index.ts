@@ -15,6 +15,7 @@ export * as NextAction from "./NextAction.js"
  * @category type ids
  */
 export * as NextLayout from "./NextLayout.js"
+export * as NextServerComponent from "./NextServerComponent.js"
 
 /**
  * @since 1.0.0
