@@ -76,11 +76,11 @@ export interface NextPage<
   setParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, S["Type"], SearchParamsA>
   setSearchParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, ParamsA, S["Type"]>
 
-  run<
+  build<
     InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>>,
     OnError = never
   >(
-    build: InnerHandler,
+    handler: InnerHandler,
     onError?: (
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
@@ -140,9 +140,9 @@ const Proto = {
     return makeProto(options)
   },
 
-  run(
+  build(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>,
+    handler: (ctx: any) => Effect<any, any, any>,
     onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
@@ -170,7 +170,7 @@ const Proto = {
             : rawSearchParams
           return { params: decodedParams, searchParams: decodedSearchParams }
         })
-        let handlerEffect = build(payload as any) as Effect<any, any, any>
+        let handlerEffect = handler(payload as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
           const options = {
             _type: "page" as const,
@@ -354,7 +354,7 @@ export type SearchParams<P extends Any> = P extends
   SearchParamsA extends undefined ? Promise<Record<string, string>> : SearchParamsA
   : never
 
-// Error typing helpers for run onError
+// Error typing helpers for build onError
 type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
 
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>

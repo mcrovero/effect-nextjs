@@ -71,11 +71,11 @@ export interface NextLayout<
 
   setParamsSchema<S extends AnySchema>(schema: S): NextLayout<Tag, L, Middleware, S["Type"]>
 
-  run<
+  build<
     InnerHandler extends HandlerFrom<NextLayout<Tag, L, Middleware, ParamsA>>,
     OnError = never
   >(
-    build: InnerHandler,
+    handler: InnerHandler,
     onError?: (
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
@@ -121,9 +121,9 @@ const Proto = {
     return makeProto(options)
   },
 
-  run(
+  build(
     this: AnyWithProps,
-    build: (ctx: any) => Effect<any, any, any>,
+    handler: (ctx: any) => Effect<any, any, any>,
     onError?: (error: unknown) => unknown
   ) {
     const middlewares = this.middlewares
@@ -145,7 +145,7 @@ const Proto = {
           const children = props?.children
           return { params: decodedParams, children }
         })
-        let handlerEffect = build(payload as any) as Effect<any, any, any>
+        let handlerEffect = handler(payload as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
           const options = { _type: "layout" as const, params: props?.params, children: props?.children }
           const tags = middlewares as ReadonlyArray<any>
@@ -313,7 +313,7 @@ export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Laye
   ParamsA extends undefined ? Promise<Record<string, string>> : ParamsA
   : never
 
-// Error typing helpers for run onError
+// Error typing helpers for build onError
 type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
 
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>

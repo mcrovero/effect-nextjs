@@ -41,7 +41,7 @@ describe("Middleware ordering", () => {
       .middleware(Wrapped)
       .middleware(NonWrapped)
 
-    const result = await page.run(() =>
+    const result = await page.build(() =>
       Effect.gen(function*() {
         yield* Effect.sync(() => order.push("handler"))
         return "ok"
@@ -86,7 +86,7 @@ describe("Middleware ordering", () => {
       .middleware(Wrapped)
       .middleware(NonWrapped)
 
-    const result = await layout.run(() =>
+    const result = await layout.build(() =>
       Effect.gen(function*() {
         yield* Effect.sync(() => order.push("handler"))
         return "ok"
@@ -133,7 +133,7 @@ describe("Middleware ordering", () => {
       .middleware(Wrapped)
       .middleware(NonWrapped)
 
-    const result = await action.run(async () =>
+    const result = await action.build(async () =>
       Effect.gen(function*() {
         yield* Effect.sync(() => order.push("handler"))
         return "ok"
@@ -179,7 +179,7 @@ describe("Middleware ordering", () => {
       .middleware(Wrapped)
       .middleware(NonWrapped)
 
-    const result = await component.run(() =>
+    const result = await component.build(() =>
       Effect.gen(function*() {
         yield* Effect.sync(() => order.push("handler"))
         return "ok"

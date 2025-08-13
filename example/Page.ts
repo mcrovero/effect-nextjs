@@ -20,7 +20,7 @@ const page = Next.make(ProvideUserLive)
   .page("Home")
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .middleware(ProvideUser)
-  .run(({ params }) =>
+  .build(({ params }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
       return { user, params }

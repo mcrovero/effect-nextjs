@@ -20,7 +20,7 @@ const layout = Next.make(ThemeLive)
   .layout("RootLayout")
   .setParamsSchema(Schema.Struct({ locale: Schema.String }))
   .middleware(ThemeMiddleware)
-  .run(({ params, children }) =>
+  .build(({ params, children }) =>
     Effect.gen(function*() {
       const theme = yield* Theme
       return { theme, params, children }

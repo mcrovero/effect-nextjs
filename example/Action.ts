@@ -29,7 +29,7 @@ const action = Next.make(AuthLive).action("Submit")
     })
   )
   .middleware(AuthMiddleware)
-  .run(async ({ input }) =>
+  .build(async ({ input }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
       return { user, input }

@@ -61,7 +61,7 @@ describe("NextPage", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    const result = await page.run(({ params, searchParams }) =>
+    const result = await page.build(({ params, searchParams }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
         const other = yield* Other

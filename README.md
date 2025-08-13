@@ -2,7 +2,7 @@
 
 **Alpha warning**: This library is in early alpha and is not ready for production use.
 
-Typed helpers to build Next.js App Router pages, layouts, server components, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and run your `Effect` programs with a single call.
+Typed helpers to build Next.js App Router pages, layouts, server components, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
 
 ### Getting Started
 
@@ -41,7 +41,7 @@ export const page = Next.make(AppLive)
   .page("HomePage")
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .middleware(AuthMiddleware)
-  .run(({ params }) =>
+  .build(({ params }) =>
     Effect.gen(function* () {
       const user = yield* CurrentUser
       return <div>Hello {user.name}</div>
@@ -57,7 +57,7 @@ import { page } from "@/lib/app" // wherever you defined it
 
 const page = Next.make(AppLive)
   .page("HomePage")
-  .run(({ params }) =>
+  .build(({ params }) =>
     Effect.gen(function* () {
       const user = yield* CurrentUser
       return <div>Hello {user.name}</div>
@@ -82,8 +82,8 @@ Notes
 - Use `.layout(tag)`, `.component(tag)`, and `.action(tag)` for layouts, server components, and server actions.
 - Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
 - Add multiple middlewares with `.middleware(...)`. Middlewares can be marked `optional` or `wrap` via the tag options.
-- Provide a custom error mapping with `.run(build, onError)`.
-- Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.run(...)` for actions must be `async`, returning a Promise of an Effect.
+- Provide a custom error mapping with `.build(handler, onError)`.
+- Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.build(...)` for actions must be `async`, returning a Promise of an Effect.
 
 ### Middlewares with dependencies
 
@@ -122,7 +122,7 @@ const AppLive = Layer.mergeAll(OtherLive, AuthLive)
 const page = Next.make(AppLive)
   .page("Home")
   .middleware(AuthMiddleware)
-  .run(() =>
+  .build(() =>
     Effect.gen(function* () {
       const user = yield* CurrentUser
       return user
@@ -138,7 +138,7 @@ Access provided services with `yield* Tag` inside your `Effect` handler.
 const page = Next.make(AppLive)
   .page("Home")
   .middleware(AuthMiddleware)
-  .run(() =>
+  .build(() =>
     Effect.gen(function* () {
       const user = yield* CurrentUser
       // use `user` here
@@ -182,7 +182,7 @@ const AppLive = Layer.mergeAll(WrappedLive)
 const page = Next.make(AppLive)
   .page("Home")
   .middleware(Wrapped)
-  .run(() => Effect.succeed("ok"))
+  .build(() => Effect.succeed("ok"))
 ```
 
 ### OpenTelemetry integration (example)
@@ -228,19 +228,19 @@ const page = Next.make(AppLive)
   .page("Home")
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .setSearchParamsSchema(Schema.Struct({ q: Schema.optional(Schema.String) }))
-  .run(({ params, searchParams }) => Effect.succeed({ params, searchParams }))
+  .build(({ params, searchParams }) => Effect.succeed({ params, searchParams }))
 
 // Input (Action)
 // IMPORTANT: The action handler must be async because of Next.js server action requirements
 const action = Next.make(AppLive)
   .action("DoSomething")
   .setInputSchema(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))
-  .run(async ({ input }) => Effect.succeed({ ok: true, input }))
+  .build(async ({ input }) => Effect.succeed({ ok: true, input }))
 
 // Server Component (no inputs):
 const component = Next.make(AppLive)
   .component("ServerInfo")
-  .run(() => Effect.succeed({ ok: true }))
+  .build(() => Effect.succeed({ ok: true }))
 ```
 
 ### Running Code
