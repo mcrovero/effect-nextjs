@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.1.4
+
+### Patch Changes
+
+- [#15](https://github.com/mcrovero/effect-nextjs/pull/15) [`4d03690`](https://github.com/mcrovero/effect-nextjs/commit/4d03690e6a9918f15c7633cbde6c1d2548f84ed4) Thanks @mcrovero! - Fix encoded/decoded type actions
+
 ## 0.1.3
 
 ### Patch Changes
