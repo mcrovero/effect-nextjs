@@ -27,4 +27,3 @@ const component = Next.make(TimeLive)
   )
 
 console.log(await component())
-

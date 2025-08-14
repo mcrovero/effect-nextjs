@@ -20,12 +20,11 @@ const layout = Next.make(ThemeLive)
   .layout("RootLayout")
   .setParamsSchema(Schema.Struct({ locale: Schema.String }))
   .middleware(ThemeMiddleware)
-  .build(({ params, children }) =>
+  .build(({ children, params }) =>
     Effect.gen(function*() {
       const theme = yield* Theme
       return { theme, params, children }
     })
   )
 
-console.log(await layout({ params: Promise.resolve({ locale: "en" }), children: "<div>Child</div>" }))
-
+console.log(await layout({ children: "<div>Child</div>", params: Promise.resolve({ locale: "en" }) }))

@@ -28,4 +28,3 @@ const page = Next.make(ProvideUserLive)
   )
 
 console.log(await page({ params: Promise.resolve({ id: "abc" }) }))
-
