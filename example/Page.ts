@@ -23,8 +23,9 @@ const page = Next.make(ProvideUserLive)
   .build(({ params }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
-      return { user, params }
+      const resolvedParams = yield* params
+      return { user, params: resolvedParams }
     })
   )
 
-console.log(await page({ params: Promise.resolve({ id: "abc" }) }))
+console.log(await page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) }))

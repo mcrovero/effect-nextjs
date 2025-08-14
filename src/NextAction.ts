@@ -124,7 +124,7 @@ const Proto = {
         const payload = { input }
         let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
         if (middlewares.length > 0) {
-          const options = { _type: "action" as const, input: (payload as any).input }
+          const options = { callerKind: "action" as const, input: (payload as any).input }
           const tags = middlewares as ReadonlyArray<any>
           const buildChain = (index: number): Effect<any, any, any> => {
             if (index >= tags.length) {

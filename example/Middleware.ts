@@ -64,4 +64,4 @@ const _page = Next.make(ProdLive).page("HomePage")
     return { error: "error" }
   })
 
-console.log(await _page({ params: Promise.resolve({ id: "abc" }) }))
+console.log(await _page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) }))

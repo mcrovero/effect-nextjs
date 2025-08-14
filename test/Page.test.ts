@@ -1,6 +1,7 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import type { ParseError } from "effect/ParseResult"
 import * as Schema from "effect/Schema"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import * as Next from "../src/Next.js"
@@ -44,16 +45,12 @@ describe("NextPage", () => {
     expect(mws).toContain(AuthMiddleware)
     expect(mws).toContain(OtherMiddleware)
 
-    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toEqualTypeOf<
-      Promise<Record<string, string | undefined>>
-    >(
-      undefined as any
-    )
-    expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toEqualTypeOf<
-      Promise<Record<string, string | undefined>>
-    >(
-      undefined as any
-    )
+    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toMatchTypeOf<
+      Effect.Effect<{ id: string }, ParseError, never>
+    >(undefined as any)
+    expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toMatchTypeOf<
+      Effect.Effect<{ q: string }, ParseError, never>
+    >(undefined as any)
   })
 
   it("runs handler with provided services and decoded params", async () => {
@@ -65,12 +62,12 @@ describe("NextPage", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    const result = await page.build(({ params, parsedSearchParams }) =>
+    const result = await page.build(({ params, searchParams }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
         const other = yield* Other
-        const resolvedParams = yield* Effect.promise(() => params)
-        const resolvedSearchParams = yield* parsedSearchParams
+        const resolvedParams = yield* params
+        const resolvedSearchParams = yield* searchParams
         return { user, other, params: resolvedParams, searchParams: resolvedSearchParams }
       })
     )({ params: Promise.resolve({ id: "p1" }), searchParams: Promise.resolve({ q: "hello" }) })

@@ -98,7 +98,7 @@ const Proto = {
         const context = yield* Effect_.context<never>()
         let handlerEffect = handler(undefined as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
-          const options = { _type: "component" as const }
+          const options = { callerKind: "component" as const }
           const tags = middlewares as ReadonlyArray<any>
           const buildChain = (index: number): Effect<any, any, any> => {
             if (index >= tags.length) {

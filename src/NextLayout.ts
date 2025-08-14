@@ -134,18 +134,19 @@ const Proto = {
       readonly params: Promise<Record<string, string | undefined>>
       readonly children?: any
     }) => {
-      const params = props?.params ?? Promise.resolve({})
+      const rawParams = props?.params ?? Promise.resolve({})
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        const payload = { params, children: props?.children } as any
-        if (paramsSchema) {
-          payload.parsedParams = Effect_.promise(() => params).pipe(
+        const paramsEffect = paramsSchema
+          ? Effect_.promise(() => rawParams).pipe(
             Effect_.flatMap((value: any) => (Schema_ as any).decodeUnknown(paramsSchema as any)(value))
           )
-        }
+          : Effect_.promise(() => rawParams)
+        const payload = { params: paramsEffect, children: props?.children } as any
+
         let handlerEffect = handler(payload as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
-          const options = { _type: "layout" as const, params, children: props?.children }
+          const options = { callerKind: "layout" as const, params: rawParams, children: props?.children }
           const tags = middlewares as ReadonlyArray<any>
           const buildChain = (index: number): Effect<any, any, any> => {
             if (index >= tags.length) {
@@ -297,7 +298,7 @@ export type ToHandlerFn<R extends Any> = (
   request: {
     readonly params: Params<R>
     readonly children: any
-  } & (ParsedParams<R> extends undefined ? object : { readonly parsedParams: ParsedParams<R> })
+  }
 ) => Effect<any, any, ExtractProvides<R>>
 
 /**
@@ -310,12 +311,8 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
   : never
 
 export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA> ?
-  Promise<Record<string, string | undefined>>
-  : never
-
-export type ParsedParams<P extends Any> = P extends
-  NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer ParamsA> ?
-  ParamsA extends undefined ? undefined : Effect<ParamsA, ParseError, never>
+  _ParamsA extends undefined ? Effect_.Effect<Readonly<Record<string, undefined>>, never, never>
+  : Effect_.Effect<_ParamsA, ParseError, never>
   : never
 
 // Error typing helpers for build onError
