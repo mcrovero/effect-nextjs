@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.1.0
+
+### Minor Changes
+
+- [#10](https://github.com/mcrovero/effect-nextjs/pull/10) [`755ff4a`](https://github.com/mcrovero/effect-nextjs/commit/755ff4a73f1f5e44cf20ffd3802aee976ad60522) Thanks @mcrovero! - Now params and search params are passed as raw values and then it has been added parsedSearchParams and parsedParams that return effects
+
 ## 0.0.3
 
 ### Patch Changes
