@@ -3,6 +3,7 @@ import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
+import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
@@ -85,7 +86,7 @@ export interface NextPage<
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
   ): (
-    props?: {
+    props: {
       readonly params?: Promise<Record<string, string>>
       readonly searchParams?: Promise<Record<string, string>>
     }
@@ -114,7 +115,9 @@ const Proto = {
     return makeProto({
       _tag: this._tag,
       layer: this.layer,
-      middlewares: [...this.middlewares, middleware]
+      middlewares: [...this.middlewares, middleware],
+      ...(this.paramsSchema !== undefined ? { paramsSchema: this.paramsSchema } as const : {}),
+      ...(this.searchParamsSchema !== undefined ? { searchParamsSchema: this.searchParamsSchema } as const : {})
     })
   },
   setParamsSchema(this: AnyWithProps, schema: AnySchema) {
@@ -149,27 +152,25 @@ const Proto = {
     const layer = this.layer
     const paramsSchema = this.paramsSchema
     const searchParamsSchema = this.searchParamsSchema
-    return (props?: {
+    return async (props: {
       readonly params?: Promise<Record<string, string>>
       readonly searchParams?: Promise<Record<string, string>>
     }) => {
+      const params = props?.params ?? Promise.resolve({} as Record<string, string>)
+      const searchParams = props?.searchParams ?? Promise.resolve({} as Record<string, string>)
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        const payload = yield* Effect_.gen(function*() {
-          const rawParams = props?.params !== undefined
-            ? yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
-            : undefined
-          const decodedParams = paramsSchema && rawParams !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
-            : rawParams
-          const rawSearchParams = props?.searchParams !== undefined
-            ? yield* Effect_.promise(() => props!.searchParams as Promise<Record<string, string>>)
-            : undefined
-          const decodedSearchParams = searchParamsSchema && rawSearchParams !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(searchParamsSchema)(rawSearchParams)
-            : rawSearchParams
-          return { params: decodedParams, searchParams: decodedSearchParams }
-        })
+        const payload = { params: props?.params, searchParams: props?.searchParams } as any
+        if (paramsSchema) {
+          payload.parsedParams = Effect_.promise(() => params).pipe(
+            Effect_.flatMap((value) => Schema_.decodeUnknown(paramsSchema as any)(value))
+          )
+        }
+        if (searchParamsSchema) {
+          payload.parsedSearchParams = Effect_.promise(() => searchParams).pipe(
+            Effect_.flatMap((value) => Schema_.decodeUnknown(searchParamsSchema as any)(value))
+          )
+        }
         let handlerEffect = handler(payload as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
           const options = {
@@ -330,10 +331,15 @@ export type ToHandler<R extends Any> = R extends NextPage<infer _Tag, infer _Mid
  * @since 1.0.0
  * @category models
  */
-export type ToHandlerFn<R extends Any> = (request: {
-  readonly params: Params<R>
-  readonly searchParams: SearchParams<R>
-}) => Effect<any, any, ExtractProvides<R>>
+export type ToHandlerFn<R extends Any> = (
+  request:
+    & {
+      readonly params: Params<R>
+      readonly searchParams: SearchParams<R>
+    }
+    & (ParsedParams<R> extends undefined ? object : { readonly parsedParams: ParsedParams<R> })
+    & (ParsedSearchParams<R> extends undefined ? object : { readonly parsedSearchParams: ParsedSearchParams<R> })
+) => Effect<any, any, ExtractProvides<R>>
 
 /**
  * @since 1.0.0
@@ -345,13 +351,23 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
   : never
 
 export type Params<P extends Any> = P extends
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
+  Promise<Record<string, string>>
+  : never
+
+export type ParsedParams<P extends Any> = P extends
   NextPage<infer _Tag, infer _Layer, infer _Middleware, infer ParamsA, infer _SearchParamsA> ?
-  ParamsA extends undefined ? Promise<Record<string, string>> : ParamsA
+  (ParamsA extends undefined ? undefined : Effect<ParamsA, ParseError, never>)
   : never
 
 export type SearchParams<P extends Any> = P extends
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
+  Promise<Record<string, string>> | undefined
+  : never
+
+export type ParsedSearchParams<P extends Any> = P extends
   NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer SearchParamsA> ?
-  SearchParamsA extends undefined ? Promise<Record<string, string>> : SearchParamsA
+  (SearchParamsA extends undefined ? undefined : Effect<SearchParamsA, ParseError, never>)
   : never
 
 // Error typing helpers for build onError

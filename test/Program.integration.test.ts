@@ -73,7 +73,7 @@ describe("Program integration", () => {
         const other = yield* Other
         return { user, other }
       })
-    )()
+    )({ params: Promise.resolve({}) })
 
     expect(result).toEqual({
       user: { id: "123", name: "John Doe" },

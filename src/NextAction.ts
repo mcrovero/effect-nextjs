@@ -3,6 +3,7 @@ import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
+import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
@@ -116,13 +117,11 @@ const Proto = {
     return async (inputArg: unknown) => {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        const payload = yield* Effect_.gen(function*() {
-          const rawInput = inputArg !== undefined ? inputArg : undefined
-          const decodedInput = inputSchema && rawInput !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(inputSchema)(rawInput)
-            : rawInput
-          return { input: decodedInput }
-        })
+        const rawInput = inputArg !== undefined ? inputArg : undefined
+        const input = inputSchema
+          ? (Schema_ as any).decodeUnknown(inputSchema)(rawInput)
+          : rawInput
+        const payload = { input }
         let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
         if (middlewares.length > 0) {
           const options = { _type: "action" as const, input: (payload as any).input }
@@ -280,9 +279,11 @@ export type ToHandler<R extends Any> = R extends NextAction<infer _Tag, infer _M
  * @since 1.0.0
  * @category models
  */
-export type ToHandlerFn<R extends Any> = (request: {
-  readonly input: HandlerInput<R>
-}) => Promise<Effect<any, any, ExtractProvides<R>>>
+export type ToHandlerFn<R extends Any> = (
+  request: {
+    readonly input: HandlerInputEffect<R>
+  }
+) => Promise<Effect<any, any, ExtractProvides<R>>>
 
 /**
  * @since 1.0.0
@@ -300,6 +301,11 @@ export type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Layer
 export type HandlerInput<P extends Any> = P extends
   NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
   InputA extends Schema.Schema<infer encoded, infer _decoded, infer _c> ? encoded : unknown
+  : never
+
+export type HandlerInputEffect<P extends Any> = P extends
+  NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
+  (InputA extends Schema.Schema<infer _encoded, infer decoded, infer _c> ? Effect<decoded, ParseError, never> : unknown)
   : never
 
 // Error typing helpers for build onError

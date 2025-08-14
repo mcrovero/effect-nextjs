@@ -3,6 +3,7 @@ import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
+import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
@@ -80,7 +81,7 @@ export interface NextLayout<
       error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
     ) => OnError
   ): (
-    props?: {
+    props: {
       readonly params?: Promise<Record<string, string>>
       readonly children?: any
     }
@@ -129,22 +130,19 @@ const Proto = {
     const middlewares = this.middlewares
     const layer = this.layer
     const paramsSchema = this.paramsSchema
-    return (props?: {
+    return async (props: {
       readonly params?: Promise<Record<string, string>>
       readonly children?: any
     }) => {
+      const params = props?.params ?? Promise.resolve({} as Record<string, string>)
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        const payload = yield* Effect_.gen(function*() {
-          const rawParams = props?.params !== undefined
-            ? yield* Effect_.promise(() => props!.params as Promise<Record<string, string>>)
-            : undefined
-          const decodedParams = paramsSchema && rawParams !== undefined
-            ? yield* (Schema_ as any).decodeUnknown(paramsSchema)(rawParams)
-            : rawParams
-          const children = props?.children
-          return { params: decodedParams, children }
-        })
+        const payload = { params: props?.params, children: props?.children } as any
+        if (paramsSchema) {
+          payload.parsedParams = Effect_.promise(() => params).pipe(
+            Effect_.flatMap((value: any) => (Schema_ as any).decodeUnknown(paramsSchema as any)(value))
+          )
+        }
         let handlerEffect = handler(payload as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
           const options = { _type: "layout" as const, params: props?.params, children: props?.children }
@@ -295,10 +293,12 @@ export type ToHandler<R extends Any> = R extends NextLayout<infer _Tag, infer _M
  * @since 1.0.0
  * @category models
  */
-export type ToHandlerFn<R extends Any> = (request: {
-  readonly params: Params<R>
-  readonly children: any
-}) => Effect<any, any, ExtractProvides<R>>
+export type ToHandlerFn<R extends Any> = (
+  request: {
+    readonly params: Params<R>
+    readonly children: any
+  } & (ParsedParams<R> extends undefined ? object : { readonly parsedParams: ParsedParams<R> })
+) => Effect<any, any, ExtractProvides<R>>
 
 /**
  * @since 1.0.0
@@ -309,8 +309,13 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 ) => Effect<infer _A, infer _E, infer _R> ? ExcludeProvides<_R, P>
   : never
 
-export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer ParamsA> ?
-  ParamsA extends undefined ? Promise<Record<string, string>> : ParamsA
+export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA> ?
+  Promise<Record<string, string>>
+  : never
+
+export type ParsedParams<P extends Any> = P extends
+  NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer ParamsA> ?
+  ParamsA extends undefined ? undefined : Effect<ParamsA, ParseError, never>
   : never
 
 // Error typing helpers for build onError
