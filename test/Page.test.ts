@@ -44,10 +44,14 @@ describe("NextPage", () => {
     expect(mws).toContain(AuthMiddleware)
     expect(mws).toContain(OtherMiddleware)
 
-    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toEqualTypeOf<{ id: string }>(
+    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toEqualTypeOf<
+      Promise<Record<string, string | undefined>>
+    >(
       undefined as any
     )
-    expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toEqualTypeOf<{ q: string }>(
+    expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toEqualTypeOf<
+      Promise<Record<string, string | undefined>>
+    >(
       undefined as any
     )
   })
@@ -61,11 +65,13 @@ describe("NextPage", () => {
       .middleware(AuthMiddleware)
       .middleware(OtherMiddleware)
 
-    const result = await page.build(({ params, searchParams }) =>
+    const result = await page.build(({ params, parsedSearchParams }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
         const other = yield* Other
-        return { user, other, params, searchParams }
+        const resolvedParams = yield* Effect.promise(() => params)
+        const resolvedSearchParams = yield* parsedSearchParams
+        return { user, other, params: resolvedParams, searchParams: resolvedSearchParams }
       })
     )({ params: Promise.resolve({ id: "p1" }), searchParams: Promise.resolve({ q: "hello" }) })
 

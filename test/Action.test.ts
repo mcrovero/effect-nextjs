@@ -42,7 +42,8 @@ describe("NextAction", () => {
     const result = await action.build(async ({ input }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
-        return { user, input }
+        const decoded = yield* input
+        return { user, input: decoded }
       })
     )({ id: 1 })
 

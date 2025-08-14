@@ -28,7 +28,9 @@ describe("NextLayout", () => {
     expect(layout.key).toBe("@mcrovero/effect-nextjs/NextLayout/Root")
     const mws = [...layout.middlewares]
     expect(mws).toContain(ThemeMiddleware)
-    expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toEqualTypeOf<{ locale: string }>(
+    expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toEqualTypeOf<
+      Promise<Record<string, string | undefined>>
+    >(
       undefined as any
     )
   })
@@ -42,7 +44,8 @@ describe("NextLayout", () => {
     const result = await layout.build(({ children, params }) =>
       Effect.gen(function*() {
         const theme = yield* Theme
-        return { theme, params, children }
+        const resolvedParams = yield* Effect.promise(() => params)
+        return { theme, params: resolvedParams, children }
       })
     )({ params: Promise.resolve({ locale: "en" }), children: "child" })
 

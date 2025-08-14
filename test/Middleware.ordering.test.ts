@@ -46,7 +46,7 @@ describe("Middleware ordering", () => {
         yield* Effect.sync(() => order.push("handler"))
         return "ok"
       })
-    )()
+    )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
 
     expect(result).toBe("ok")
     expect(order).toEqual(["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
