@@ -311,7 +311,7 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
   : never
 
 export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA> ?
-  _ParamsA extends undefined ? Effect_.Effect<Readonly<Record<string, undefined>>, never, never>
+  _ParamsA extends undefined ? Effect_.Effect<Readonly<Record<string, string | undefined>>, never, never>
   : Effect_.Effect<_ParamsA, ParseError, never>
   : never
 

@@ -354,13 +354,13 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 
 export type Params<P extends Any> = P extends
   NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
-  _ParamsA extends undefined ? Effect<Readonly<Record<string, undefined>>, never, never>
+  _ParamsA extends undefined ? Effect<Readonly<Record<string, string | undefined>>, never, never>
   : Effect<_ParamsA, ParseError, never>
   : never
 
 export type SearchParams<P extends Any> = P extends
   NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
-  _SearchParamsA extends undefined ? Effect<Readonly<Record<string, undefined>>, never, never>
+  _SearchParamsA extends undefined ? Effect<Readonly<Record<string, string | undefined>>, never, never>
   : Effect<_SearchParamsA, ParseError, never>
   : never
 
