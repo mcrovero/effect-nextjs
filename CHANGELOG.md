@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.1.1
+
+### Patch Changes
+
+- [`0a9f733`](https://github.com/mcrovero/effect-nextjs/commit/0a9f73343003f3f725a3c922b2bf3aceb165bb1f) Thanks @mcrovero! - Unify parameter handling across Layout, Page, and Middleware
+
 ## 0.1.0
 
 ### Minor Changes
