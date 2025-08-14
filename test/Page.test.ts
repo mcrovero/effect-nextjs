@@ -44,11 +44,13 @@ describe("NextPage", () => {
     expect(mws).toContain(AuthMiddleware)
     expect(mws).toContain(OtherMiddleware)
 
-    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toEqualTypeOf<Promise<Record<string, string>>>(
+    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toEqualTypeOf<
+      Promise<Record<string, string | undefined>>
+    >(
       undefined as any
     )
     expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toEqualTypeOf<
-      Promise<Record<string, string>> | undefined
+      Promise<Record<string, string | undefined>>
     >(
       undefined as any
     )

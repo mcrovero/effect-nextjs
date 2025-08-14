@@ -82,7 +82,7 @@ export interface NextLayout<
     ) => OnError
   ): (
     props: {
-      readonly params?: Promise<Record<string, string>>
+      readonly params: Promise<Record<string, string | undefined>>
       readonly children?: any
     }
   ) => Promise<
@@ -131,13 +131,13 @@ const Proto = {
     const layer = this.layer
     const paramsSchema = this.paramsSchema
     return async (props: {
-      readonly params?: Promise<Record<string, string>>
+      readonly params: Promise<Record<string, string | undefined>>
       readonly children?: any
     }) => {
-      const params = props?.params ?? Promise.resolve({} as Record<string, string>)
+      const params = props?.params ?? Promise.resolve({})
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        const payload = { params: props?.params, children: props?.children } as any
+        const payload = { params, children: props?.children } as any
         if (paramsSchema) {
           payload.parsedParams = Effect_.promise(() => params).pipe(
             Effect_.flatMap((value: any) => (Schema_ as any).decodeUnknown(paramsSchema as any)(value))
@@ -145,7 +145,7 @@ const Proto = {
         }
         let handlerEffect = handler(payload as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
-          const options = { _type: "layout" as const, params: props?.params, children: props?.children }
+          const options = { _type: "layout" as const, params, children: props?.children }
           const tags = middlewares as ReadonlyArray<any>
           const buildChain = (index: number): Effect<any, any, any> => {
             if (index >= tags.length) {
@@ -310,7 +310,7 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
   : never
 
 export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA> ?
-  Promise<Record<string, string>>
+  Promise<Record<string, string | undefined>>
   : never
 
 export type ParsedParams<P extends Any> = P extends

@@ -87,8 +87,8 @@ export interface NextPage<
     ) => OnError
   ): (
     props: {
-      readonly params?: Promise<Record<string, string>>
-      readonly searchParams?: Promise<Record<string, string>>
+      readonly params: Promise<Record<string, string | undefined>>
+      readonly searchParams: Promise<Record<string, string | undefined>>
     }
   ) => Promise<
     | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
@@ -153,14 +153,14 @@ const Proto = {
     const paramsSchema = this.paramsSchema
     const searchParamsSchema = this.searchParamsSchema
     return async (props: {
-      readonly params?: Promise<Record<string, string>>
-      readonly searchParams?: Promise<Record<string, string>>
+      readonly params: Promise<Record<string, string | undefined>>
+      readonly searchParams: Promise<Record<string, string | undefined>>
     }) => {
-      const params = props?.params ?? Promise.resolve({} as Record<string, string>)
-      const searchParams = props?.searchParams ?? Promise.resolve({} as Record<string, string>)
+      const params = props?.params ?? Promise.resolve({})
+      const searchParams = props?.searchParams ?? Promise.resolve({})
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        const payload = { params: props?.params, searchParams: props?.searchParams } as any
+        const payload = { params, searchParams } as any
         if (paramsSchema) {
           payload.parsedParams = Effect_.promise(() => params).pipe(
             Effect_.flatMap((value) => Schema_.decodeUnknown(paramsSchema as any)(value))
@@ -175,8 +175,8 @@ const Proto = {
         if (middlewares.length > 0) {
           const options = {
             _type: "page" as const,
-            params: props?.params ?? Promise.resolve({} as Record<string, string>),
-            searchParams: props?.searchParams
+            params,
+            searchParams
           }
           const tags = middlewares as ReadonlyArray<any>
           const buildChain = (index: number): Effect<any, any, any> => {
@@ -352,7 +352,7 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 
 export type Params<P extends Any> = P extends
   NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
-  Promise<Record<string, string>>
+  Promise<Record<string, string | undefined>>
   : never
 
 export type ParsedParams<P extends Any> = P extends
@@ -362,7 +362,7 @@ export type ParsedParams<P extends Any> = P extends
 
 export type SearchParams<P extends Any> = P extends
   NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
-  Promise<Record<string, string>> | undefined
+  Promise<Record<string, string | undefined>>
   : never
 
 export type ParsedSearchParams<P extends Any> = P extends

@@ -24,7 +24,7 @@ export type TypeId = typeof TypeId
 type MiddlewareOptions = {
   readonly _type: "page"
   readonly params: Promise<Record<string, string>>
-  readonly searchParams?: Promise<Record<string, string>>
+  readonly searchParams: Promise<Record<string, string>>
 } | {
   readonly _type: "layout"
   readonly params: Promise<Record<string, string>>
