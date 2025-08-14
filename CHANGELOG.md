@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.1.3
+
+### Patch Changes
+
+- [`4a20402`](https://github.com/mcrovero/effect-nextjs/commit/4a20402088c3ca6cb44119f68bb07599f91a288d) Thanks @mcrovero! - Fixed symbol page
+
 ## 0.1.2
 
 ### Patch Changes
