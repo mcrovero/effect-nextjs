@@ -28,7 +28,9 @@ describe("NextLayout", () => {
     expect(layout.key).toBe("@mcrovero/effect-nextjs/NextLayout/Root")
     const mws = [...layout.middlewares]
     expect(mws).toContain(ThemeMiddleware)
-    expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toEqualTypeOf<Promise<Record<string, string>>>(
+    expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toEqualTypeOf<
+      Promise<Record<string, string | undefined>>
+    >(
       undefined as any
     )
   })
