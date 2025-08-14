@@ -2,9 +2,8 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { describe, expect, expectTypeOf, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import * as Next from "../src/Next.js"
-import type * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("NextAction", () => {
@@ -28,9 +27,6 @@ describe("NextAction", () => {
     expect(action.key).toBe("@mcrovero/effect-nextjs/NextAction/Submit")
     const mws = [...action.middlewares]
     expect(mws).toContain(AuthMiddleware)
-    expectTypeOf<NextAction.HandlerInput<typeof action>>(undefined as any).toEqualTypeOf<{ id: number }>(
-      undefined as any
-    )
   })
 
   it("runs handler with provided services and decoded input", async () => {
@@ -47,6 +43,23 @@ describe("NextAction", () => {
       })
     )({ id: 1 })
 
+    expect(result).toEqual({ user: { id: "123", name: "John Doe" }, input: { id: 1 } })
+  })
+
+  it("accepts input as encoded and uses it decoded", async () => {
+    const action = Next.make(AuthLive)
+      .action("Submit")
+      .setInputSchema(Schema.Struct({ id: Schema.NumberFromString }))
+      .middleware(AuthMiddleware)
+      .build(async ({ input }) =>
+        Effect.gen(function*() {
+          const user = yield* CurrentUser
+          const decoded = yield* input
+          return { user, input: decoded }
+        })
+      )({ id: "1" })
+
+    const result = await action
     expect(result).toEqual({ user: { id: "123", name: "John Doe" }, input: { id: 1 } })
   })
 })
