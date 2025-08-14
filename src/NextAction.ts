@@ -119,7 +119,7 @@ const Proto = {
         const context = yield* Effect_.context<never>()
         const rawInput = inputArg !== undefined ? inputArg : undefined
         const input = inputSchema
-          ? (Schema_ as any).decodeUnknown(inputSchema)(rawInput)
+          ? Schema_.decodeUnknown(inputSchema as any)(rawInput)
           : rawInput
         const payload = { input }
         let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
@@ -295,17 +295,12 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
   : never
 
 export type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
-  InputA extends Schema.Schema<infer _encoded, infer decoded, infer _c> ? decoded : unknown
-  : never
-
-export type HandlerInput<P extends Any> = P extends
-  NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
-  InputA extends Schema.Schema<infer encoded, infer _decoded, infer _c> ? encoded : unknown
+  InputA extends Schema.Schema<infer _type, infer encoded, infer _c> ? encoded : unknown
   : never
 
 export type HandlerInputEffect<P extends Any> = P extends
   NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
-  (InputA extends Schema.Schema<infer _encoded, infer decoded, infer _c> ? Effect<decoded, ParseError, never> : unknown)
+  (InputA extends Schema.Schema<infer type, infer _encoded, infer _c> ? Effect<type, ParseError, never> : unknown)
   : never
 
 // Error typing helpers for build onError
