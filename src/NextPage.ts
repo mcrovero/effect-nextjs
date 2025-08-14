@@ -16,7 +16,7 @@ import type * as NextMiddleware from "./NextMiddleware.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Rpc")
+export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Page")
 
 /**
  * @since 1.0.0
@@ -314,7 +314,7 @@ export type ExtractProvides<R extends Any> = R extends
 export type ExcludeProvides<Env, R extends Any> = Exclude<Env, ExtractProvides<R>>
 
 /**
- * Represents an implemented rpc.
+ * Represents an implemented page.
  *
  * @since 1.0.0
  * @category models

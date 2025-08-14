@@ -222,7 +222,7 @@ export type ExtractProvides<R extends Any> = R extends NextServerComponent<infer
 export type ExcludeProvides<Env, R extends Any> = Exclude<Env, ExtractProvides<R>>
 
 /**
- * Represents an implemented rpc.
+ * Represents an implemented component.
  *
  * @since 1.0.0
  * @category models
