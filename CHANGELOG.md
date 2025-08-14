@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.1.2
+
+### Patch Changes
+
+- [`40be3b1`](https://github.com/mcrovero/effect-nextjs/commit/40be3b1edc6e0d621485c3efae6b4932024fefef) Thanks @mcrovero! - fix type searchparams and params
+
 ## 0.1.1
 
 ### Patch Changes
