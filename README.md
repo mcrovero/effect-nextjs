@@ -79,6 +79,7 @@ Notes
 - Add multiple middlewares with `.middleware(...)`. Middlewares can be marked `optional` or `wrap` via the tag options.
 - Provide a custom error mapping with `.build(handler, onError)`.
 - Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.build(...)` for actions must be `async`, returning a Promise of an Effect.
+- You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
 ### Middlewares with dependencies
 
