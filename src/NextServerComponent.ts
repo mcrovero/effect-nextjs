@@ -233,6 +233,6 @@ export type ToHandler<R extends Any> = R extends NextServerComponent<infer _Tag,
  */
 export type ToHandlerFn<R extends Any> = () => Effect<any, any, ExtractProvides<R>>
 
-// Error typing helpers for build onError
+// Error typing helpers for build
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? Schema.Schema.Type<M["failure"]> : never
 export type HandlerError<H> = H extends (...args: any) => Effect<infer _A, infer _E, any> ? _E : never
