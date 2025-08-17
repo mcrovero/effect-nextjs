@@ -78,6 +78,7 @@ Notes
 - Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
 - Add multiple middlewares with `.middleware(...)`. Middlewares can be marked `optional` or `wrap` via the tag options.
 - Provide a custom error mapping with `.build(handler, onError)`.
+- Server Components: `.build` infers props from the handler parameter. If your handler is `(props) => Effect<...>`, the result is `(props) => Promise<...>`. If your handler is `() => Effect<...>`, the result is `() => Promise<...>`.
 - Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.build(...)` for actions must be `async`, returning a Promise of an Effect.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
@@ -233,8 +234,17 @@ const action = Next.make(AppLive)
   .setInputSchema(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))
   .build(async ({ input }) => Effect.succeed({ ok: true, input }))
 
-// Server Component (no inputs):
-const component = Next.make(AppLive)
+// Server Component (with props):
+export default Next.make(AppLive)
+  .component("ServerInfo")
+  .build(({ time }: { time: { now: number } }) =>
+    Effect.succeed({
+      time
+    })
+  )
+
+// Or, no props:
+export const component = Next.make(AppLive)
   .component("ServerInfo")
   .build(() => Effect.succeed({ ok: true }))
 ```
