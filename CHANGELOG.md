@@ -1,5 +1,13 @@
 # @mcrovero/effect-nextjs
 
+## 0.2.0
+
+### Minor Changes
+
+- [#19](https://github.com/mcrovero/effect-nextjs/pull/19) [`4468531`](https://github.com/mcrovero/effect-nextjs/commit/4468531eeb5aeaea403d400bed0ac6f09b492b84) Thanks @mcrovero! - - Add props-aware overloads to `NextServerComponent.build` so components can accept typed props and return a callable with matching parameter types.
+  - Forward `props` at runtime and preserve middleware chaining and error mapping.
+  - Update `example/ServerComponent.ts` to demonstrate the new API and adjust `README.md` with usage notes and examples for both props and no-props cases.
+
 ## 0.1.4
 
 ### Patch Changes
