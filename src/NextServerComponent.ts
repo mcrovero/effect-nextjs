@@ -51,18 +51,28 @@ export interface NextServerComponent<
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextServerComponent<Tag, L, Middleware | M>
 
+  // props-less variant
   build<
-    InnerHandler extends HandlerFrom<NextServerComponent<Tag, L, Middleware>>,
+    Out,
     OnError = never
   >(
-    handler: InnerHandler,
+    handler: () => Effect<Out, any, any>,
     onError?: (
-      error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
+      error: MiddlewareErrors<Middleware> | HandlerError<() => Effect<Out, any, any>>
     ) => OnError
-  ): () => Promise<
-    | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
-    | OnError
-  >
+  ): () => Promise<Out | OnError>
+
+  // props variant (infers Props from handler parameter)
+  build<
+    Props,
+    Out,
+    OnError = never
+  >(
+    handler: (props: Props) => Effect<Out, any, any>,
+    onError?: (
+      error: MiddlewareErrors<Middleware> | HandlerError<(props: Props) => Effect<Out, any, any>>
+    ) => OnError
+  ): (props: Props) => Promise<Out | OnError>
 }
 
 export interface Any extends Pipeable {
@@ -93,10 +103,10 @@ const Proto = {
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
-    return () => {
+    return (props?: any) => {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
-        let handlerEffect = handler(undefined as any) as Effect<any, any, any>
+        let handlerEffect = handler(props as any) as Effect<any, any, any>
         if (middlewares.length > 0) {
           const options = { callerKind: "component" as const }
           const tags = middlewares as ReadonlyArray<any>
