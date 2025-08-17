@@ -53,26 +53,15 @@ export interface NextServerComponent<
 
   // props-less variant
   build<
-    Out,
-    OnError = never
+    Out
   >(
-    handler: () => Effect<Out, any, any>,
-    onError?: (
-      error: MiddlewareErrors<Middleware> | HandlerError<() => Effect<Out, any, any>>
-    ) => OnError
-  ): () => Promise<Out | OnError>
+    handler: () => Effect<Out, any, any>
+  ): () => Promise<Out>
 
   // props variant (infers Props from handler parameter)
-  build<
-    Props,
-    Out,
-    OnError = never
-  >(
-    handler: (props: Props) => Effect<Out, any, any>,
-    onError?: (
-      error: MiddlewareErrors<Middleware> | HandlerError<(props: Props) => Effect<Out, any, any>>
-    ) => OnError
-  ): (props: Props) => Promise<Out | OnError>
+  build<Props, Out>(
+    handler: (props: Props) => Effect<Out, any, any>
+  ): (props: Props) => Promise<Out>
 }
 
 export interface Any extends Pipeable {
@@ -98,8 +87,7 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>,
-    onError?: (error: unknown) => unknown
+    handler: (ctx: any) => Effect<any, any, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -143,24 +131,13 @@ const Proto = {
       return Effect_.runPromiseExit(program as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
-            onEmpty: () => {
-              throw new Error("empty")
-            },
+            onEmpty: () => new Error("empty"),
             onFail: (error) => error,
             onDie: (defect) => defect,
-            onInterrupt: (fiberId) => {
-              throw new Error(`Interrupted`, { cause: fiberId })
-            },
-            onSequential: (left, right) => {
-              throw new Error(`Sequential (left: ${left}) (right: ${right})`)
-            },
-            onParallel: (left, right) => {
-              throw new Error(`Parallel (left: ${left}) (right: ${right})`)
-            }
+            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
+            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
+            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
           })
-          if (onError) {
-            return onError(mappedError) as any
-          }
           throw mappedError
         }
         return result.value

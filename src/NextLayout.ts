@@ -73,22 +73,15 @@ export interface NextLayout<
   setParamsSchema<S extends AnySchema>(schema: S): NextLayout<Tag, L, Middleware, S["Type"]>
 
   build<
-    InnerHandler extends HandlerFrom<NextLayout<Tag, L, Middleware, ParamsA>>,
-    OnError = never
+    InnerHandler extends HandlerFrom<NextLayout<Tag, L, Middleware, ParamsA>>
   >(
-    handler: InnerHandler,
-    onError?: (
-      error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
-    ) => OnError
+    handler: InnerHandler
   ): (
     props: {
       readonly params: Promise<Record<string, string | undefined>>
       readonly children?: any
     }
-  ) => Promise<
-    | (ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)
-    | OnError
-  >
+  ) => Promise<(ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)>
 }
 
 export interface Any extends Pipeable {
@@ -124,8 +117,7 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>,
-    onError?: (error: unknown) => unknown
+    handler: (ctx: any) => Effect<any, any, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -181,24 +173,13 @@ const Proto = {
       return Effect_.runPromiseExit(program as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
-            onEmpty: () => {
-              throw new Error("empty")
-            },
+            onEmpty: () => new Error("empty"),
             onFail: (error) => error,
             onDie: (defect) => defect,
-            onInterrupt: (fiberId) => {
-              throw new Error(`Interrupted`, { cause: fiberId })
-            },
-            onSequential: (left, right) => {
-              throw new Error(`Sequential (left: ${left}) (right: ${right})`)
-            },
-            onParallel: (left, right) => {
-              throw new Error(`Parallel (left: ${left}) (right: ${right})`)
-            }
+            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
+            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
+            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
           })
-          if (onError) {
-            return onError(mappedError) as any
-          }
           throw mappedError
         }
         return result.value
@@ -315,7 +296,7 @@ export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Laye
   : Effect_.Effect<_ParamsA, ParseError, never>
   : never
 
-// Error typing helpers for build onError
+// Error typing helpers for build
 type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
 
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>

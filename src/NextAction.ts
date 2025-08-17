@@ -59,19 +59,12 @@ export interface NextAction<
   setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
 
   build<
-    InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>,
-    OnError = never
+    InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>
   >(
-    handler: InnerHandler,
-    onError?: (
-      error: MiddlewareErrors<Middleware> | HandlerError<InnerHandler>
-    ) => OnError
+    handler: InnerHandler
   ): (
     input: Input<NextAction<Tag, L, Middleware, InputA>>
-  ) => Promise<
-    | (ReturnType<InnerHandler> extends Promise<Effect<infer _A, any, any>> ? _A : never)
-    | OnError
-  >
+  ) => Promise<(ReturnType<InnerHandler> extends Promise<Effect<infer _A, any, any>> ? _A : never)>
 }
 
 export interface Any extends Pipeable {
@@ -108,8 +101,7 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Promise<Effect<any, any, any>>,
-    onError?: (error: unknown) => unknown
+    handler: (ctx: any) => Promise<Effect<any, any, any>>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -153,37 +145,19 @@ const Proto = {
         return yield* handlerEffect
       }).pipe(Effect_.provide(layer))
 
-      const handled = Effect_.matchEffect(program as Effect<any, any, never>, {
-        onFailure: (error) => Effect_.succeed(onError ? onError(error) : error),
-        onSuccess: (value) => Effect_.succeed(value)
-      })
-
       /**
        * Workaround to handle redirect errors
        */
-      return Effect_.runPromiseExit(handled).then((result) => {
+      return Effect_.runPromiseExit(program as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
-            onEmpty: () => {
-              throw new Error("empty")
-            },
+            onEmpty: () => new Error("empty"),
             onFail: (error) => error,
-            onDie: (defect) => {
-              throw defect
-            },
-            onInterrupt: (fiberId) => {
-              throw new Error(`Interrupted`, { cause: fiberId })
-            },
-            onSequential: (left, right) => {
-              throw new Error(`Sequential (left: ${left}) (right: ${right})`)
-            },
-            onParallel: (left, right) => {
-              throw new Error(`Parallel (left: ${left}) (right: ${right})`)
-            }
+            onDie: (defect) => defect,
+            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
+            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
+            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
           })
-          if (onError) {
-            return onError(mappedError) as any
-          }
           throw mappedError
         }
         return result.value
@@ -303,7 +277,7 @@ export type HandlerInputEffect<P extends Any> = P extends
   (InputA extends Schema.Schema<infer type, infer _encoded, infer _c> ? Effect<type, ParseError, never> : unknown)
   : never
 
-// Error typing helpers for build onError
+// Error typing helpers for build
 type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>
   : never

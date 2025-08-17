@@ -50,16 +50,8 @@ export interface NextMiddleware<Provides, E, R = never> {
  */
 export interface NextMiddlewareWrap<Provides, E, R> {
   (
-    options: MiddlewareOptions & { readonly next: Effect.Effect<SuccessValue, E, Provides> }
-  ): Effect.Effect<SuccessValue, E, R>
-}
-
-/**
- * @since 1.0.0
- * @category models
- */
-export interface SuccessValue {
-  readonly _: unique symbol
+    options: MiddlewareOptions & { readonly next: Effect.Effect<any, E, Provides> }
+  ): Effect.Effect<any, E, R>
 }
 
 /**
@@ -266,11 +258,11 @@ export function layer<
     options:
       & MiddlewareOptions
       & (
-        M["wrap"] extends true ? { readonly next: Effect.Effect<SuccessValue, FailureFromTag<M>, ProvidedService<M>> }
+        M["wrap"] extends true ? { readonly next: Effect.Effect<any, FailureFromTag<M>, ProvidedService<M>> }
           : unknown
       )
   ) => Effect.Effect<
-    M["wrap"] extends true ? SuccessValue : ProvidedService<M>,
+    M["wrap"] extends true ? any : ProvidedService<M>,
     FailureServiceFromTag<M>,
     InferRFromImpl<Impl>
   >
