@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.3.0
+
+### Minor Changes
+
+- [`256f09a`](https://github.com/mcrovero/effect-nextjs/commit/256f09a4d7d5cd6d57faf30819016a1c172690ae) Thanks @mcrovero! - breaking: removed onError and improved error management
+
 ## 0.2.0
 
 ### Minor Changes
