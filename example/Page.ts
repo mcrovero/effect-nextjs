@@ -1,6 +1,7 @@
 import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import { ParseError } from "effect/ParseResult"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
@@ -16,10 +17,30 @@ const ProvideUserLive = Layer.succeed(
   ProvideUser.of(() => Effect.succeed({ id: "u-1", name: "Alice" }))
 )
 
-const page = Next.make(ProvideUserLive)
+export class CatchAll extends NextMiddleware.Tag<CatchAll>()(
+  "CatchAll",
+  {
+    catches: Schema.Union(Schema.String, Schema.instanceOf(ParseError)),
+    wrap: true,
+    returns: Schema.Struct({ success: Schema.Literal(false), error: Schema.String })
+  }
+) {}
+
+const CatchAllLive = NextMiddleware.layer(
+  CatchAll,
+  ({ next }) =>
+    Effect.gen(function*() {
+      return yield* next.pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
+    })
+)
+
+const app = Layer.mergeAll(CatchAllLive, ProvideUserLive)
+
+const page = Next.make(app)
   .page("Home")
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .middleware(ProvideUser)
+  .middleware(CatchAll)
   .build(({ params }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
@@ -28,4 +49,5 @@ const page = Next.make(ProvideUserLive)
     })
   )
 
-console.log(await page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) }))
+const result = await page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) })
+console.log(result)

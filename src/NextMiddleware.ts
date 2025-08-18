@@ -48,10 +48,10 @@ export interface NextMiddleware<Provides, E, R = never> {
  * @since 1.0.0
  * @category models
  */
-export interface NextMiddlewareWrap<Provides, E, R> {
+export interface NextMiddlewareWrap<Provides, Catches, R> {
   (
-    options: MiddlewareOptions & { readonly next: Effect.Effect<any, E, Provides> }
-  ): Effect.Effect<any, E, R>
+    options: MiddlewareOptions & { readonly next: Effect.Effect<any, Catches, Provides> }
+  ): Effect.Effect<any, never, R>
 }
 
 /**
@@ -70,7 +70,8 @@ export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
   Self,
   Name,
   Options,
-  TagClass.Wrap<Options> extends true ? NextMiddlewareWrap<TagClass.Provides<Options>, TagClass.Failure<Options>, R>
+  TagClass.Wrap<Options> extends true
+    ? NextMiddlewareWrap<TagClass.Provides<Options>, TagClass.CatchesValue<Options>, R>
     : NextMiddleware<TagClass.Service<Options>, TagClass.FailureService<Options>, R>
 >
 
@@ -146,13 +147,37 @@ export declare namespace TagClass {
    * @since 1.0.0
    * @category models
    */
+  export type CatchesSchema<Options> = Wrap<Options> extends true
+    ? Options extends { readonly catches: Schema.Schema.All } ? Options["catches"] : typeof Schema.Never
+    : typeof Schema.Never
+
+  /**
+   * @since 1.0.0
+   * @category models
+   */
+  export type CatchesValue<Options> = CatchesSchema<Options> extends Schema.Schema<infer A, any, any> ? A : never
+
+  /**
+   * @since 1.0.0
+   * @category models
+   */
+  export type ReturnsSchema<Options> = Wrap<Options> extends true
+    ? Options extends { readonly returns: Schema.Schema.All } ? Options["returns"] : typeof Schema.Never
+    : typeof Schema.Never
+
+  /**
+   * @since 1.0.0
+   * @category models
+   */
   export interface Base<Self, Name extends string, Options, Service> extends Context.Tag<Self, Service> {
     new(_: never): Context.TagClassShape<Name, Service>
     readonly [TypeId]: TypeId
     readonly optional: Optional<Options>
     readonly failure: FailureSchema<Options>
+    readonly catches: CatchesSchema<Options>
     readonly provides: Options extends { readonly provides: Context.Tag<any, any> } ? Options["provides"] : undefined
     readonly wrap: Wrap<Options>
+    readonly returns: ReturnsSchema<Options>
   }
 }
 
@@ -165,7 +190,9 @@ export interface TagClassAny extends Context.Tag<any, any> {
   readonly optional: boolean
   readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
+  readonly catches: Schema.Schema.All
   readonly wrap: boolean
+  readonly returns: Schema.Schema.All
 }
 
 /**
@@ -175,9 +202,11 @@ export interface TagClassAny extends Context.Tag<any, any> {
 export interface TagClassAnyWithProps extends Context.Tag<any, any> {
   readonly [TypeId]: TypeId
   readonly optional: boolean
-  readonly provides?: Context.Tag<any, any>
+  readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
+  readonly catches: Schema.Schema.All
   readonly wrap: boolean
+  readonly returns: Schema.Schema.All
 }
 
 /**
@@ -186,24 +215,30 @@ export interface TagClassAnyWithProps extends Context.Tag<any, any> {
  */
 export const Tag = <Self>(): <
   const Name extends string,
-  const Options extends {
-    readonly wrap?: boolean
-    readonly optional?: boolean
-    readonly failure?: Schema.Schema.All
-    readonly provides?: Context.Tag<any, any>
-  }
+  const Options extends (
+    | {
+      readonly wrap: true
+      readonly optional?: boolean
+      readonly failure?: Schema.Schema.All
+      readonly provides?: Context.Tag<any, any>
+      readonly catches?: Schema.Schema.All
+      readonly returns?: Schema.Schema.All
+    }
+    | {
+      readonly wrap?: false
+      readonly optional?: boolean
+      readonly failure?: Schema.Schema.All
+      readonly provides?: Context.Tag<any, any>
+      readonly catches?: undefined
+    }
+  )
 >(
   id: Name,
   options?: Options | undefined
 ) => TagClass<Self, Name, Options, never> =>
 (
   id: string,
-  options?: {
-    readonly wrap?: boolean
-    readonly optional?: boolean
-    readonly failure?: Schema.Schema.All
-    readonly provides?: Context.Tag<any, any>
-  }
+  options?: any
 ) => {
   const Err = globalThis.Error as any
   const limit = Err.stackTraceLimit
@@ -221,12 +256,18 @@ export const Tag = <Self>(): <
     }
   })
   TagClass_[TypeId] = TypeId
-  TagClass_.failure = options?.optional === true || options?.failure === undefined ? Schema.Never : options.failure
+  TagClass_.failure = options?.optional === true || options?.failure === undefined ? Schema.Never : options.failure // catches is only meaningful for wrapped middlewares; default to Schema.Never otherwise
+  ;(TagClass_ as any).catches = options && (options as any).wrap === true && (options as any).catches !== undefined
+    ? (options as any).catches
+    : Schema.Never
   if (options?.provides) {
     TagClass_.provides = options.provides
   }
   TagClass_.optional = options?.optional ?? false
   TagClass_.wrap = options?.wrap ?? false
+  ;(TagClass_ as any).returns = options && (options as any).wrap === true && (options as any).returns !== undefined
+    ? (options as any).returns
+    : Schema.Never
   return TagClass as any
 }
 
@@ -258,12 +299,12 @@ export function layer<
     options:
       & MiddlewareOptions
       & (
-        M["wrap"] extends true ? { readonly next: Effect.Effect<any, FailureFromTag<M>, ProvidedService<M>> }
+        M["wrap"] extends true ? { readonly next: Effect.Effect<any, TagClass.CatchesValue<M>, ProvidedService<M>> }
           : unknown
       )
   ) => Effect.Effect<
     M["wrap"] extends true ? any : ProvidedService<M>,
-    FailureServiceFromTag<M>,
+    M["wrap"] extends true ? never : FailureServiceFromTag<M>,
     InferRFromImpl<Impl>
   >
 >(

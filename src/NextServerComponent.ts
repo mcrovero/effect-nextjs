@@ -52,16 +52,14 @@ export interface NextServerComponent<
   ): NextServerComponent<Tag, L, Middleware | M>
 
   // props-less variant
-  build<
-    Out
-  >(
-    handler: () => Effect<Out, any, any>
-  ): () => Promise<Out>
+  build<Out, E extends CatchesFromMiddleware<Middleware>>(
+    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
+  ): () => Promise<Out | WrappedReturns<Middleware>>
 
   // props variant (infers Props from handler parameter)
-  build<Props, Out>(
-    handler: (props: Props) => Effect<Out, any, any>
-  ): (props: Props) => Promise<Out>
+  build<Props, Out, E extends CatchesFromMiddleware<Middleware>>(
+    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
+  ): (props: Props) => Promise<Out | WrappedReturns<Middleware>>
 }
 
 export interface Any extends Pipeable {
@@ -231,8 +229,33 @@ export type ToHandler<R extends Any> = R extends NextServerComponent<infer _Tag,
  * @since 1.0.0
  * @category models
  */
-export type ToHandlerFn<R extends Any> = () => Effect<any, any, ExtractProvides<R>>
+export type ToHandlerFn<R extends Any> = () => Effect<any, never, ExtractProvides<R>>
 
 // Error typing helpers for build
 export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? Schema.Schema.Type<M["failure"]> : never
 export type HandlerError<H> = H extends (...args: any) => Effect<infer _A, infer _E, any> ? _E : never
+
+// Allowed errors are from wrapped middlewares' catches schema (otherwise never)
+export type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
+  : never
+
+// Allow handler error to be E if and only if it's assignable to Allowed
+export type AllowedHandler<H, Allowed> = H extends (
+  ...args: any
+) => Effect<infer _X, infer E, any> ? (E extends Allowed ? H : never)
+  : never
+
+// Helper to constrain a server component handler's error to an allowed schema-derived type
+export type BuildHandlerWithErrorNoProps<P extends Any, E> = (
+  request?: void
+) => Effect<any, E, ExtractProvides<P>>
+
+export type BuildHandlerWithErrorWithProps<P extends Any, E, Props> = (
+  request: Props
+) => Effect<any, E, ExtractProvides<P>>
+
+// Collect the union of "returns" value types from wrapped middlewares' Schema
+type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
+type WrappedReturns<M> = M extends { readonly wrap: true }
+  ? InferSchemaOutput<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
+  : never

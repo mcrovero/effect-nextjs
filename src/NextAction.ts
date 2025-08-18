@@ -6,8 +6,7 @@ import * as Effect_ from "effect/Effect"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
-import type * as Schema from "effect/Schema"
-import * as Schema_ from "effect/Schema"
+import * as Schema from "effect/Schema"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -59,12 +58,13 @@ export interface NextAction<
   setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
 
   build<
-    InnerHandler extends HandlerFrom<NextAction<Tag, L, Middleware, InputA>>
+    E extends CatchesFromMiddleware<Middleware>,
+    H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
   >(
-    handler: InnerHandler
+    handler: H
   ): (
     input: Input<NextAction<Tag, L, Middleware, InputA>>
-  ) => Promise<(ReturnType<InnerHandler> extends Promise<Effect<infer _A, any, any>> ? _A : never)>
+  ) => Promise<(ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never)>
 }
 
 export interface Any extends Pipeable {
@@ -111,7 +111,7 @@ const Proto = {
         const context = yield* Effect_.context<never>()
         const rawInput = inputArg !== undefined ? inputArg : undefined
         const input = inputSchema
-          ? Schema_.decodeUnknown(inputSchema as any)(rawInput)
+          ? Schema.decodeUnknown(inputSchema as any)(rawInput)
           : rawInput
         const payload = { input }
         let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
@@ -257,7 +257,7 @@ export type ToHandlerFn<R extends Any> = (
   request: {
     readonly input: HandlerInputEffect<R>
   }
-) => Promise<Effect<any, any, ExtractProvides<R>>>
+) => Promise<Effect<any, never, ExtractProvides<R>>>
 
 /**
  * @since 1.0.0
@@ -286,3 +286,26 @@ export type HandlerError<H> = H extends (
   ...args: any
 ) => Effect<infer _A, infer _E, any> ? _E :
   never
+
+// Allowed errors are from wrapped middlewares' catches schema (otherwise never)
+export type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
+  : never
+
+// Allow handler error to be E if and only if it's assignable to Allowed
+export type AllowedHandler<H, Allowed> = H extends (
+  ...args: any
+) => Promise<Effect<infer _X, infer E, any>> ? (E extends Allowed | ParseError ? H : never)
+  : never
+
+// Helper to constrain an action handler's error to an allowed schema-derived type
+export type BuildHandlerWithError<P extends Any, E> = (
+  request: {
+    readonly input: HandlerInputEffect<P>
+  }
+) => Promise<Effect<any, E, ExtractProvides<P>>>
+
+// Collect the union of "returns" value types from wrapped middlewares' Schema
+type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
+type WrappedReturns<M> = M extends { readonly wrap: true }
+  ? InferSchemaOutput<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
+  : never

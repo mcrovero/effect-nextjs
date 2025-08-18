@@ -6,8 +6,7 @@ import * as Effect_ from "effect/Effect"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
-import type * as Schema from "effect/Schema"
-import * as Schema_ from "effect/Schema"
+import * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 // import type { Scope } from "effect/Scope"
 import type * as NextMiddleware from "./NextMiddleware.js"
@@ -78,15 +77,16 @@ export interface NextPage<
   setSearchParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, ParamsA, S["Type"]>
 
   build<
-    InnerHandler extends HandlerFrom<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>>
+    E extends CatchesFromMiddleware<Middleware>,
+    H extends BuildHandlerWithError<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
   >(
-    handler: InnerHandler
+    handler: H
   ): (
     props: {
       readonly params: Promise<Record<string, string | undefined>>
       readonly searchParams: Promise<Record<string, string | undefined>>
     }
-  ) => Promise<(ReturnType<InnerHandler> extends Effect<infer _A, any, any> ? _A : never)>
+  ) => Promise<ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never>
 }
 
 export interface Any extends Pipeable {
@@ -154,12 +154,12 @@ const Proto = {
         const context = yield* Effect_.context<never>()
         const paramsEffect = paramsSchema
           ? Effect_.promise(() => rawParams).pipe(
-            Effect_.flatMap((value) => Schema_.decodeUnknown(paramsSchema as any)(value))
+            Effect_.flatMap((value) => Schema.decodeUnknown(paramsSchema as any)(value))
           )
           : Effect_.promise(() => rawParams)
         const searchParamsEffect = searchParamsSchema
           ? Effect_.promise(() => rawSearchParams).pipe(
-            Effect_.flatMap((value) => Schema_.decodeUnknown(searchParamsSchema as any)(value))
+            Effect_.flatMap((value) => Schema.decodeUnknown(searchParamsSchema as any)(value))
           )
           : Effect_.promise(() => rawSearchParams)
 
@@ -315,7 +315,7 @@ export type ToHandlerFn<R extends Any> = (
     readonly params: Params<R>
     readonly searchParams: SearchParams<R>
   }
-) => Effect<any, any, ExtractProvides<R>>
+) => Effect<any, never, ExtractProvides<R>>
 
 /**
  * @since 1.0.0
@@ -348,3 +348,27 @@ export type HandlerError<H> = H extends (
   ...args: any
 ) => Effect<infer _A, infer _E, any> ? _E :
   never
+
+// Allowed errors are from wrapped middlewares' catches schema (otherwise never)
+export type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
+  : never
+
+// Allow handler error to be E if and only if it's assignable to Allowed
+export type AllowedHandler<H, Allowed> = H extends (
+  ...args: any
+) => Effect<infer _X, infer E, any> ? (E extends Allowed | ParseError ? H : never)
+  : never
+
+// Helper to constrain a page handler's error to an allowed schema-derived type
+export type BuildHandlerWithError<P extends Any, E> = (
+  request: {
+    readonly params: Params<P>
+    readonly searchParams: SearchParams<P>
+  }
+) => Effect<any, E, ExtractProvides<P>>
+
+// Collect the union of "returns" value types from wrapped middlewares' Schema
+type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
+type WrappedReturns<M> = M extends { readonly wrap: true }
+  ? InferSchemaOutput<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
+  : never

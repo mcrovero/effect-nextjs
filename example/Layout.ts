@@ -25,7 +25,7 @@ const layout = Next.make(ThemeLive)
       const theme = yield* Theme
       const resolvedParams = yield* params
       return { theme, params: resolvedParams, children }
-    })
+    }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
   )
 
 console.log(await layout({ children: "<div>Child</div>", params: Promise.resolve({ locale: "en" }) }))

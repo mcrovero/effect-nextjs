@@ -34,7 +34,7 @@ const action = Next.make(AuthLive).action("Submit")
       const user = yield* CurrentUser
       const parsed = yield* input
       return { user, parsed }
-    })
+    }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
   )
 
 console.log(await action({ id: 123 }))

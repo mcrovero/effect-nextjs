@@ -69,7 +69,7 @@ describe("NextPage", () => {
         const resolvedParams = yield* params
         const resolvedSearchParams = yield* searchParams
         return { user, other, params: resolvedParams, searchParams: resolvedSearchParams }
-      })
+      }).pipe(Effect.catchAll(() => Effect.succeed({ error: "error" })))
     )({ params: Promise.resolve({ id: "p1" }), searchParams: Promise.resolve({ q: "hello" }) })
 
     expect(result).toEqual({
