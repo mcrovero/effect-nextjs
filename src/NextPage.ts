@@ -375,7 +375,7 @@ export type BuildHandlerWithErrorLoose<P extends Any> = (
     readonly params: Params<P>
     readonly searchParams: SearchParams<P>
   }
-) => Effect<unknown, unknown, unknown>
+) => Effect<unknown, unknown, ExtractProvides<P>>
 
 export type HandlerErrors<H> = H extends (
   ...args: any

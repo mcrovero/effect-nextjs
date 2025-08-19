@@ -51,34 +51,20 @@ export interface NextServerComponent<
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextServerComponent<Tag, L, Middleware | M>
 
-  // props-less variant
+  // single signature supporting props/no-props and strict/loose error typing
   build<
-    Out,
-    E extends CatchesFromMiddleware<Middleware>,
-    F extends [] | [
-      onError: (
-        error: Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-      ) => Effect<any, never, any>
-    ]
+    H extends
+      | (() => Effect<any, any, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>)
+      | ((props: any) => Effect<any, any, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>),
+    F extends HandlerError<H> extends CatchesFromMiddleware<Middleware>
+      ? [] | [onError: (error: ReturnType<H>) => Effect<any, never, any>]
+      : [onError: (error: ReturnType<H>) => Effect<any, never, any>]
   >(
-    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>,
+    handler: H,
     ...onError: F
-  ): () => Promise<Out | WrappedReturns<Middleware>>
-
-  // props variant (infers Props from handler parameter)
-  build<
-    Props,
-    Out,
-    E extends CatchesFromMiddleware<Middleware>,
-    F extends [] | [
-      onError: (
-        error: Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-      ) => Effect<any, never, any>
-    ]
-  >(
-    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>,
-    ...onError: F
-  ): (props: Props) => Promise<Out | WrappedReturns<Middleware>>
+  ): (
+    ...args: Parameters<H> extends [] ? [] : [props: Parameters<H>[0]]
+  ) => Promise<ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never>
 }
 
 export interface Any extends Pipeable {
@@ -260,14 +246,23 @@ export type AllowedHandler<H, Allowed> = H extends (
 ) => Effect<infer _X, infer E, any> ? (E extends Allowed ? H : never)
   : never
 
-// Helper to constrain a server component handler's error to an allowed schema-derived type
-export type BuildHandlerWithErrorNoProps<P extends Any, E> = (
+// Strict/loose helpers (no props)
+export type BuildHandlerWithErrorStrictNoProps<P extends Any, E> = (
   request?: void
 ) => Effect<any, E, ExtractProvides<P>>
 
-export type BuildHandlerWithErrorWithProps<P extends Any, E, Props> = (
+export type BuildHandlerWithErrorLooseNoProps<P extends Any> = (
+  request?: void
+) => Effect<unknown, unknown, ExtractProvides<P>>
+
+// Strict/loose helpers (with props)
+export type BuildHandlerWithErrorStrictWithProps<P extends Any, E, Props> = (
   request: Props
 ) => Effect<any, E, ExtractProvides<P>>
+
+export type BuildHandlerWithErrorLooseWithProps<P extends Any, Props> = (
+  request: Props
+) => Effect<unknown, unknown, ExtractProvides<P>>
 
 // Collect the union of "returns" value types from wrapped middlewares' Schema
 type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never

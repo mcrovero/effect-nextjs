@@ -318,7 +318,7 @@ export type BuildHandlerWithErrorLoose<P extends Any> = (
   request: {
     readonly input: HandlerInputEffect<P>
   }
-) => Promise<Effect<unknown, unknown, unknown>>
+) => Promise<Effect<unknown, unknown, ExtractProvides<P>>>
 
 export type HandlerErrors<H> = H extends (
   ...args: any
