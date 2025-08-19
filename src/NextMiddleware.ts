@@ -86,7 +86,6 @@ export declare namespace TagClass {
    */
   export type Provides<Options> = Options extends {
     readonly provides: Context.Tag<any, any>
-    readonly optional?: false
   } ? Context.Tag.Identifier<Options["provides"]>
     : never
 
@@ -105,7 +104,6 @@ export declare namespace TagClass {
    */
   export type FailureSchema<Options> = Options extends {
     readonly failure: Schema.Schema.All
-    readonly optional?: false
   } ? Options["failure"]
     : typeof Schema.Never
 
@@ -115,7 +113,6 @@ export declare namespace TagClass {
    */
   export type Failure<Options> = Options extends {
     readonly failure: Schema.Schema<infer _A, infer _I, infer _R>
-    readonly optional?: false
   } ? _A
     : never
 
@@ -129,13 +126,7 @@ export declare namespace TagClass {
    * @since 1.0.0
    * @category models
    */
-  export type FailureService<Options> = Optional<Options> extends true ? unknown : Failure<Options>
-
-  /**
-   * @since 1.0.0
-   * @category models
-   */
-  export type Optional<Options> = Options extends { readonly optional: true } ? true : false
+  export type FailureService<Options> = Failure<Options>
 
   /**
    * @since 1.0.0
@@ -172,7 +163,6 @@ export declare namespace TagClass {
   export interface Base<Self, Name extends string, Options, Service> extends Context.Tag<Self, Service> {
     new(_: never): Context.TagClassShape<Name, Service>
     readonly [TypeId]: TypeId
-    readonly optional: Optional<Options>
     readonly failure: FailureSchema<Options>
     readonly catches: CatchesSchema<Options>
     readonly provides: Options extends { readonly provides: Context.Tag<any, any> } ? Options["provides"] : undefined
@@ -187,7 +177,6 @@ export declare namespace TagClass {
  */
 export interface TagClassAny extends Context.Tag<any, any> {
   readonly [TypeId]: TypeId
-  readonly optional: boolean
   readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
   readonly catches: Schema.Schema.All
@@ -201,7 +190,6 @@ export interface TagClassAny extends Context.Tag<any, any> {
  */
 export interface TagClassAnyWithProps extends Context.Tag<any, any> {
   readonly [TypeId]: TypeId
-  readonly optional: boolean
   readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
   readonly catches: Schema.Schema.All
@@ -218,7 +206,6 @@ export const Tag = <Self>(): <
   const Options extends (
     | {
       readonly wrap: true
-      readonly optional?: boolean
       readonly failure?: Schema.Schema.All
       readonly provides?: Context.Tag<any, any>
       readonly catches?: Schema.Schema.All
@@ -226,7 +213,6 @@ export const Tag = <Self>(): <
     }
     | {
       readonly wrap?: false
-      readonly optional?: boolean
       readonly failure?: Schema.Schema.All
       readonly provides?: Context.Tag<any, any>
       readonly catches?: undefined
@@ -256,14 +242,13 @@ export const Tag = <Self>(): <
     }
   })
   TagClass_[TypeId] = TypeId
-  TagClass_.failure = options?.optional === true || options?.failure === undefined ? Schema.Never : options.failure // catches is only meaningful for wrapped middlewares; default to Schema.Never otherwise
+  TagClass_.failure = options?.failure === undefined ? Schema.Never : options.failure // catches is only meaningful for wrapped middlewares; default to Schema.Never otherwise
   ;(TagClass_ as any).catches = options && (options as any).wrap === true && (options as any).catches !== undefined
     ? (options as any).catches
     : Schema.Never
   if (options?.provides) {
     TagClass_.provides = options.provides
   }
-  TagClass_.optional = options?.optional ?? false
   TagClass_.wrap = options?.wrap ?? false
   ;(TagClass_ as any).returns = options && (options as any).wrap === true && (options as any).returns !== undefined
     ? (options as any).returns
@@ -290,9 +275,6 @@ type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer 
 // Infer the error type from the tag's failure schema
 type FailureFromTag<M> = M extends { readonly failure: Schema.Schema<infer A, any, any> } ? A : never
 
-// Match TagClass.FailureService behavior: if optional, error type is unknown; otherwise use FailureFromTag
-type FailureServiceFromTag<M> = M extends { readonly optional: true } ? unknown : FailureFromTag<M>
-
 export function layer<
   M extends TagClassAnyWithProps,
   Impl extends (
@@ -304,7 +286,7 @@ export function layer<
       )
   ) => Effect.Effect<
     M["wrap"] extends true ? any : ProvidedService<M>,
-    M["wrap"] extends true ? never : FailureServiceFromTag<M>,
+    M["wrap"] extends true ? never : FailureFromTag<M>,
     InferRFromImpl<Impl>
   >
 >(

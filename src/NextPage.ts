@@ -196,14 +196,6 @@ const Proto = {
             if (tag.wrap) {
               return middleware({ ...options, next: tail }) as any
             }
-            if (tag.optional) {
-              return Effect_.matchEffect(middleware(options), {
-                onFailure: () => tail,
-                onSuccess: tag.provides !== undefined
-                  ? (value: any) => Effect_.provideService(tail, tag.provides as any, value)
-                  : () => tail
-              })
-            }
             return tag.provides !== undefined
               ? Effect_.provideServiceEffect(tail, tag.provides as any, middleware(options))
               : Effect_.zipRight(middleware(options), tail)
