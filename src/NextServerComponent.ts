@@ -52,13 +52,32 @@ export interface NextServerComponent<
   ): NextServerComponent<Tag, L, Middleware | M>
 
   // props-less variant
-  build<Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
+  build<
+    Out,
+    E extends CatchesFromMiddleware<Middleware>,
+    F extends [] | [
+      onError: (
+        error: Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
+      ) => Effect<any, never, any>
+    ]
+  >(
+    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>,
+    ...onError: F
   ): () => Promise<Out | WrappedReturns<Middleware>>
 
   // props variant (infers Props from handler parameter)
-  build<Props, Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
+  build<
+    Props,
+    Out,
+    E extends CatchesFromMiddleware<Middleware>,
+    F extends [] | [
+      onError: (
+        error: Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
+      ) => Effect<any, never, any>
+    ]
+  >(
+    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>,
+    ...onError: F
   ): (props: Props) => Promise<Out | WrappedReturns<Middleware>>
 }
 
@@ -85,7 +104,8 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>
+    handler: (ctx: any) => Effect<any, any, any>,
+    onError?: (error: Effect<any, any, any>) => Effect<any, never, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -93,6 +113,9 @@ const Proto = {
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         let handlerEffect = handler(props as any) as Effect<any, any, any>
+        if (onError) {
+          handlerEffect = onError(handlerEffect)
+        }
         if (middlewares.length > 0) {
           const options = { callerKind: "component" as const }
           const tags = middlewares as ReadonlyArray<any>

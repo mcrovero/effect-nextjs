@@ -59,12 +59,25 @@ export interface NextAction<
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
+    H extends
+      | BuildHandlerWithErrorStrict<NextAction<Tag, L, Middleware, InputA>, E>
+      | BuildHandlerWithErrorLoose<NextAction<Tag, L, Middleware, InputA>>,
+    I extends H extends BuildHandlerWithErrorStrict<NextAction<Tag, L, Middleware, InputA>, E>
+      ? Input<NextAction<Tag, L, Middleware, InputA>> :
+      never,
+    O extends H extends BuildHandlerWithErrorStrict<NextAction<Tag, L, Middleware, InputA>, E> ?
+      ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never :
+      never,
+    R extends H extends BuildHandlerWithErrorStrict<NextAction<Tag, L, Middleware, InputA>, E> ?
+      (input: I) => Promise<O> :
+      never,
+    F extends H extends BuildHandlerWithErrorStrict<NextAction<Tag, L, Middleware, InputA>, E> ?
+      [] | [onError: (error: ReturnType<H>) => Effect<any, never, any>] :
+      [onError: (error: ReturnType<H>) => Effect<any, never, any>]
   >(
-    handler: H
-  ): (
-    input: Input<NextAction<Tag, L, Middleware, InputA>>
-  ) => Promise<(ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never)>
+    handler: H,
+    ...onError: F
+  ): R
 }
 
 export interface Any extends Pipeable {
@@ -101,7 +114,8 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Promise<Effect<any, any, any>>
+    handler: (ctx: any) => Promise<Effect<any, any, any>>,
+    onError?: (error: Effect<any, any, any>) => Effect<any, never, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -115,6 +129,9 @@ const Proto = {
           : rawInput
         const payload = { input }
         let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
+        if (onError) {
+          handlerEffect = onError(handlerEffect)
+        }
         if (middlewares.length > 0) {
           const options = { callerKind: "action" as const, input: (payload as any).input }
           const tags = middlewares as ReadonlyArray<any>
@@ -298,11 +315,23 @@ export type AllowedHandler<H, Allowed> = H extends (
   : never
 
 // Helper to constrain an action handler's error to an allowed schema-derived type
-export type BuildHandlerWithError<P extends Any, E> = (
+export type BuildHandlerWithErrorStrict<P extends Any, E> = (
   request: {
     readonly input: HandlerInputEffect<P>
   }
 ) => Promise<Effect<any, E, ExtractProvides<P>>>
+
+// Helper to constrain an action handler's error to an allowed schema-derived type
+export type BuildHandlerWithErrorLoose<P extends Any> = (
+  request: {
+    readonly input: HandlerInputEffect<P>
+  }
+) => Promise<Effect<unknown, unknown, unknown>>
+
+export type HandlerErrors<H> = H extends (
+  ...args: any
+) => Promise<Effect<infer _A, infer E, any>> ? E :
+  never
 
 // Collect the union of "returns" value types from wrapped middlewares' Schema
 type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never

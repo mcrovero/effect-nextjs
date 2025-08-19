@@ -78,9 +78,15 @@ export interface NextPage<
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
+    H extends
+      | BuildHandlerWithErrorStrict<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
+      | BuildHandlerWithErrorLoose<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>>,
+    F extends H extends BuildHandlerWithErrorStrict<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
+      ? [] | [onError: (error: ReturnType<H>) => Effect<any, never, any>]
+      : [onError: (error: ReturnType<H>) => Effect<any, never, any>]
   >(
-    handler: H
+    handler: H,
+    ...onError: F
   ): (
     props: {
       readonly params: Promise<Record<string, string | undefined>>
@@ -138,7 +144,8 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>
+    handler: (ctx: any) => Effect<any, any, any>,
+    onError?: (error: Effect<any, any, any>) => Effect<any, never, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -169,6 +176,9 @@ const Proto = {
         } as any
 
         let handlerEffect = handler(payload as any) as Effect<any, any, any>
+        if (onError) {
+          handlerEffect = onError(handlerEffect)
+        }
         if (middlewares.length > 0) {
           const options = {
             callerKind: "page" as const,
@@ -360,12 +370,25 @@ export type AllowedHandler<H, Allowed> = H extends (
   : never
 
 // Helper to constrain a page handler's error to an allowed schema-derived type
-export type BuildHandlerWithError<P extends Any, E> = (
+export type BuildHandlerWithErrorStrict<P extends Any, E> = (
   request: {
     readonly params: Params<P>
     readonly searchParams: SearchParams<P>
   }
 ) => Effect<any, E, ExtractProvides<P>>
+
+// Helper to allow a loosely typed page handler while requiring an onError mapper
+export type BuildHandlerWithErrorLoose<P extends Any> = (
+  request: {
+    readonly params: Params<P>
+    readonly searchParams: SearchParams<P>
+  }
+) => Effect<unknown, unknown, unknown>
+
+export type HandlerErrors<H> = H extends (
+  ...args: any
+) => Effect<infer _A, infer E, any> ? E :
+  never
 
 // Collect the union of "returns" value types from wrapped middlewares' Schema
 type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never

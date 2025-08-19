@@ -73,9 +73,15 @@ export interface NextLayout<
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextLayout<Tag, L, Middleware, ParamsA>, E>
+    H extends
+      | BuildHandlerWithErrorStrict<NextLayout<Tag, L, Middleware, ParamsA>, E>
+      | BuildHandlerWithErrorLoose<NextLayout<Tag, L, Middleware, ParamsA>>,
+    F extends H extends BuildHandlerWithErrorStrict<NextLayout<Tag, L, Middleware, ParamsA>, E>
+      ? [] | [onError: (error: ReturnType<H>) => Effect<any, never, any>]
+      : [onError: (error: ReturnType<H>) => Effect<any, never, any>]
   >(
-    handler: H
+    handler: H,
+    ...onError: F
   ): (
     props: {
       readonly params: Promise<Record<string, string | undefined>>
@@ -117,7 +123,8 @@ const Proto = {
 
   build(
     this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>
+    handler: (ctx: any) => Effect<any, any, any>,
+    onError?: (error: Effect<any, any, any>) => Effect<any, never, any>
   ) {
     const middlewares = this.middlewares
     const layer = this.layer
@@ -137,6 +144,9 @@ const Proto = {
         const payload = { params: paramsEffect, children: props?.children } as any
 
         let handlerEffect = handler(payload as any) as Effect<any, any, any>
+        if (onError) {
+          handlerEffect = onError(handlerEffect)
+        }
         if (middlewares.length > 0) {
           const options = { callerKind: "layout" as const, params: rawParams, children: props?.children }
           const tags = middlewares as ReadonlyArray<any>
@@ -318,12 +328,25 @@ export type AllowedHandler<H, Allowed> = H extends (
   : never
 
 // Helper to constrain a layout handler's error to an allowed schema-derived type
-export type BuildHandlerWithError<P extends Any, E> = (
+export type BuildHandlerWithErrorStrict<P extends Any, E> = (
   request: {
     readonly params: Params<P>
     readonly children: any
   }
 ) => Effect<any, E, ExtractProvides<P>>
+
+// Helper to allow a loosely typed layout handler while requiring an onError mapper
+export type BuildHandlerWithErrorLoose<P extends Any> = (
+  request: {
+    readonly params: Params<P>
+    readonly children: any
+  }
+) => Effect<unknown, unknown, unknown>
+
+export type HandlerErrors<H> = H extends (
+  ...args: any
+) => Effect<infer _A, infer E, any> ? E :
+  never
 
 // Collect the union of "returns" value types from wrapped middlewares' Schema
 type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
