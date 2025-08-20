@@ -59,7 +59,7 @@ const _page = Next.make(ProdLive).page("HomePage")
       const user = yield* CurrentUser
       yield* Effect.fail("error")
       return { user, params }
-    })
+    }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
   )
 
 console.log(await _page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) }))

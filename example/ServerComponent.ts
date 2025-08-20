@@ -22,6 +22,7 @@ export default Next.make(TimeLive)
   .build(({ time }: { time: { now: number } }) =>
     Effect.gen(function*() {
       const server = yield* ServerTime
+
       return { time: { ...time, now: server.now + 1000 } }
     })
   )

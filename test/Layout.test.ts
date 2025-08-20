@@ -44,7 +44,7 @@ describe("NextLayout", () => {
         const theme = yield* Theme
         const resolvedParams = yield* params
         return { theme, params: resolvedParams, children }
-      })
+      }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
     )({ params: Promise.resolve({ locale: "en" }), children: "child" })
 
     expect(result).toEqual({ theme: { mode: "dark" }, params: { locale: "en" }, children: "child" })

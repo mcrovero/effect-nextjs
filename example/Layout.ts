@@ -16,16 +16,31 @@ const ThemeLive = Layer.succeed(
   ThemeMiddleware.of(() => Effect.succeed({ mode: "dark" }))
 )
 
-const layout = Next.make(ThemeLive)
+export class CatchMiddleware extends NextMiddleware.Tag<CatchMiddleware>()(
+  "CatchMiddleware",
+  { wrap: true, catches: Schema.String }
+) {}
+
+const CatchLive = Layer.succeed(
+  CatchMiddleware,
+  CatchMiddleware.of(() => Effect.succeed({ error: "boom" }))
+)
+
+const merged = Layer.mergeAll(ThemeLive, CatchLive)
+
+const layout = Next.make(merged)
   .layout("RootLayout")
   .setParamsSchema(Schema.Struct({ locale: Schema.String }))
+  .middleware(CatchMiddleware)
   .middleware(ThemeMiddleware)
   .build(({ children, params }) =>
     Effect.gen(function*() {
       const theme = yield* Theme
       const resolvedParams = yield* params
+      yield* Effect.fail("boom")
+
       return { theme, params: resolvedParams, children }
-    })
+    }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
   )
 
 console.log(await layout({ children: "<div>Child</div>", params: Promise.resolve({ locale: "en" }) }))

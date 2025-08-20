@@ -40,7 +40,7 @@ describe("NextAction", () => {
         const user = yield* CurrentUser
         const decoded = yield* input
         return { user, input: decoded }
-      })
+      }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
     )({ id: 1 })
 
     expect(result).toEqual({ user: { id: "123", name: "John Doe" }, input: { id: 1 } })
@@ -56,7 +56,7 @@ describe("NextAction", () => {
           const user = yield* CurrentUser
           const decoded = yield* input
           return { user, input: decoded }
-        })
+        }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
       )({ id: "1" })
 
     const result = await action
