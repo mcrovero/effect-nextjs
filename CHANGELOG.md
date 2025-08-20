@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.4.0
+
+### Minor Changes
+
+- [`7b795a7`](https://github.com/mcrovero/effect-nextjs/commit/7b795a7367251477a76e42538ba172f9c8ebad62) Thanks @mcrovero! - Removed optional middlewares and added catches/returns in wrap middlewares
+
 ## 0.3.0
 
 ### Minor Changes
