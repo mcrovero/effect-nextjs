@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.4.1
+
+### Patch Changes
+
+- [`6f27463`](https://github.com/mcrovero/effect-nextjs/commit/6f27463e2ebf9e8a581e4a2fafa6ec7a20b11b3a) Thanks @mcrovero! - moved deps to peer dependencies
+
 ## 0.4.0
 
 ### Minor Changes
