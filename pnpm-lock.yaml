@@ -15,10 +15,6 @@ patchedDependencies:
 importers:
 
   .:
-    dependencies:
-      effect:
-        specifier: latest
-        version: 3.17.7
     devDependencies:
       '@babel/cli':
         specifier: ^7.24.8
@@ -71,6 +67,9 @@ importers:
       babel-plugin-annotate-pure-calls:
         specifier: ^0.4.0
         version: 0.4.0(patch_hash=lz2aochwly4t7pzapzh4fqay4m)(@babel/core@7.28.0)
+      effect:
+        specifier: ^3.0.0
+        version: 3.17.7
       eslint:
         specifier: ^9.10.0
         version: 9.33.0
