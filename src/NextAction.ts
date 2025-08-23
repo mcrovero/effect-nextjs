@@ -106,7 +106,18 @@ const Proto = {
     const middlewares = this.middlewares
     const layer = this.layer
     const inputSchema = this.inputSchema
+    // Capture definition stack for tracing (definition site)
+    const defLimit = (Error as any).stackTraceLimit
+    ;(Error as any).stackTraceLimit = 2
+    const errorDef = new Error()
+    ;(Error as any).stackTraceLimit = defLimit
+    const spanName = this.key ?? `@mcrovero/effect-nextjs/NextAction/${this._tag}`
     return async (inputArg: unknown) => {
+      // Capture call stack for tracing (call site)
+      const callLimit = (Error as any).stackTraceLimit
+      ;(Error as any).stackTraceLimit = 2
+      const errorCall = new Error()
+      ;(Error as any).stackTraceLimit = callLimit
       const program = Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const rawInput = inputArg !== undefined ? inputArg : undefined
@@ -137,10 +148,33 @@ const Proto = {
         return yield* handlerEffect
       }).pipe(Effect_.provide(layer))
 
+      // Create span and attach combined stacktrace (definition + call sites)
+      let cache: false | string = false
+      const captureStackTrace = () => {
+        if (cache !== false) {
+          return cache
+        }
+        if (errorCall.stack) {
+          const stackDef = errorDef.stack!.trim().split("\n")
+          const stackCall = errorCall.stack.trim().split("\n")
+          let endStackDef = stackDef.slice(2).join("\n").trim()
+          if (!endStackDef.includes(`(`)) {
+            endStackDef = endStackDef.replace(/at (.*)/, "at ($1)")
+          }
+          let endStackCall = stackCall.slice(2).join("\n").trim()
+          if (!endStackCall.includes(`(`)) {
+            endStackCall = endStackCall.replace(/at (.*)/, "at ($1)")
+          }
+          cache = `${endStackDef}\n${endStackCall}`
+          return cache
+        }
+      }
+      const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, { captureStackTrace })
+
       /**
        * Workaround to handle redirect errors
        */
-      return Effect_.runPromiseExit(program as Effect<any, any, never>).then((result) => {
+      return Effect_.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
             onEmpty: () => new Error("empty"),
@@ -150,6 +184,27 @@ const Proto = {
             onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
             onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
           })
+          // Append Effect Cause and captured stack to help Next.js display a richer stack
+          try {
+            const effectPretty = Cause.pretty(result.cause as any)
+            if (effectPretty && typeof effectPretty === "string") {
+              const section = `\n\n===== Effect Cause =====\n${effectPretty}\n=========================\n`
+              mappedError.stack = (mappedError.stack ?? `${mappedError.name}: ${mappedError.message}`) + section
+            }
+          } catch {
+            void 0
+          }
+          try {
+            const st = captureStackTrace?.()
+            if (st && typeof st === "string" && st.length > 0) {
+              const header = `\n--- Effect stacktrace (${spanName}) ---\n`
+              mappedError.stack = mappedError.stack
+                ? `${mappedError.stack}${header}${st}`
+                : `${header}${st}`
+            }
+          } catch {
+            void 0
+          }
           throw mappedError
         }
         return result.value
