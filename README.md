@@ -67,8 +67,7 @@ export default async function Page(props: {
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string>>
 }) {
-  const data = await page({ params: props.params, searchParams: props.searchParams })
-  return <pre>{JSON.stringify(data, null, 2)}</pre>
+  return await page({ params: props.params, searchParams: props.searchParams })
 }
 ```
 
@@ -76,8 +75,7 @@ Notes
 
 - Use `.layout(tag)`, `.component(tag)`, and `.action(tag)` for layouts, server components, and server actions.
 - Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
-- Add multiple middlewares with `.middleware(...)`. Middlewares can be marked `optional` or `wrap` via the tag options.
-- Server Components: `.build` infers props from the handler parameter. If your handler is `(props) => Effect<...>`, the result is `(props) => Promise<...>`. If your handler is `() => Effect<...>`, the result is `() => Promise<...>`.
+- You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.build(...)` for actions must be `async`, returning a Promise of an Effect.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
@@ -126,26 +124,9 @@ const page = Next.make(AppLive)
   )
 ```
 
-### Using services (Tags) in handlers
-
-Access provided services with `yield* Tag` inside your `Effect` handler.
-
-```ts
-const page = Next.make(AppLive)
-  .page("Home")
-  .middleware(AuthMiddleware)
-  .build(() =>
-    Effect.gen(function* () {
-      const user = yield* CurrentUser
-      // use `user` here
-      return user
-    })
-  )
-```
-
 ### Wrapped middlewares
 
-Wrapped middlewares (`wrap: true`) receive a `next` Effect to run when they decide. They can short-circuit, run before/after, and still provide services.
+Wrapped middlewares (`wrap: true`) receive a `next` Effect to run when they decide.
 
 ```ts
 import * as Context from "effect/Context"
@@ -179,36 +160,6 @@ const page = Next.make(AppLive)
   .page("Home")
   .middleware(Wrapped)
   .build(() => Effect.succeed("ok"))
-```
-
-### OpenTelemetry integration (example)
-
-You can wrap your Effect boundary with an OpenTelemetry span bridged from the currently active OTel span:
-
-```ts
-import { makeExternalSpan } from "@effect/opentelemetry/Tracer"
-import { trace } from "@opentelemetry/api"
-import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-import { NextMiddleware } from "@mcrovero/effect-nextjs"
-
-export class OtelSpanMiddleware extends NextMiddleware.Tag<OtelSpanMiddleware>()("OtelSpanMiddleware", {
-  wrap: true
-}) {}
-
-export const OtelSpanLive = Layer.succeed(
-  OtelSpanMiddleware,
-  OtelSpanMiddleware.of(({ next }) =>
-    Effect.sync(() => trace.getActiveSpan()).pipe(
-      Effect.flatMap((active) => {
-        if (!active) return next
-        return Effect.withSpan(next, "EffectBoundary", {
-          parent: makeExternalSpan(active.spanContext())
-        })
-      })
-    )
-  )
-)
 ```
 
 ### Parsing params, searchParams and input
@@ -248,24 +199,58 @@ export const component = Next.make(AppLive)
   .build(() => Effect.succeed({ ok: true }))
 ```
 
-### Running Code
+### Tracing (Next.js ↔ Effect)
 
-This repo uses [tsx](https://tsx.is) to execute TypeScript files via NodeJS.
+The library automatically creates spans around pages, layouts, actions, server components, and middlewares. To connect Next.js OpenTelemetry spans with Effect spans, provide a custom `Tracer` that reads the currently active OTel span and uses it as the external parent for Effect spans.
 
-```sh
-pnpm tsx ./path/to/the/file.ts
-```
+```ts
+import { Resource, Tracer as OtelTracer } from "@effect/opentelemetry"
+import { Next } from "@mcrovero/effect-nextjs"
+import { ProvideUserMiddleware, ProvideUserMiddlewareLive } from "./auth-middleware"
 
-### Operations
+import { context as otelContext, trace } from "@opentelemetry/api"
+import { Effect, Layer, Option, pipe, Schema, Tracer } from "effect"
 
-- **Build**
+export const makeTracer: Effect.Effect<Tracer.Tracer, never, never> = Effect.gen(function* () {
+  const currentTracer = yield* Effect.tracer
+  return Tracer.make({
+    span(name, parent, context, links, startTime, kind) {
+      const active = trace.getSpan(otelContext.active())
+      const otelParent = active ? active.spanContext() : undefined
 
-```sh
-pnpm build
-```
+      // If there's an active OTel span (The Next.js one), use it as the external parent for Effect spans
+      const externalParent = otelParent
+        ? Option.some(
+            Tracer.externalSpan({
+              spanId: otelParent.spanId,
+              traceId: otelParent.traceId,
+              sampled: (otelParent.traceFlags & 1) === 1,
+              context
+            })
+          )
+        : Option.none()
 
-- **Test**
+      const effectiveParent = parent._tag === "Some" ? parent : externalParent
 
-```sh
-pnpm test
+      const span = currentTracer.span(name, effectiveParent, context, links, startTime, kind)
+      return span
+    },
+    context: currentTracer.context
+  })
+})
+
+export const layerTracer: Layer.Layer<never, never, never> = pipe(
+  makeTracer,
+  Effect.map(Layer.setTracer),
+  Layer.unwrapEffect
+)
+
+const tracerWithOtel = layerTracer.pipe(
+  Layer.provide(OtelTracer.layerGlobal.pipe(Layer.provide(Resource.layer({ serviceName: "next-app" }))))
+)
+
+const allLayers = Layer.mergeAll(/* your layers */)
+const allLayersWithTracer = Layer.mergeAll(allLayers, tracerWithOtel)
+
+const NextBase = Next.make(allLayersWithTracer)
 ```
