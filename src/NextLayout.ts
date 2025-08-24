@@ -127,7 +127,12 @@ const Proto = {
     ;(Error as any).stackTraceLimit = 2
     const errorDef = new Error()
     ;(Error as any).stackTraceLimit = defLimit
-    const spanName = this.key ?? `@mcrovero/effect-nextjs/NextLayout/${this._tag}`
+    const spanName = this._tag
+    const spanAttributes = {
+      library: "@mcrovero/effect-nextjs",
+      component: "NextLayout",
+      tag: this._tag
+    } as const
     return async (props: {
       readonly params: Promise<Record<string, string | undefined>>
       readonly children?: any
@@ -158,17 +163,43 @@ const Proto = {
             const tag = tags[index] as any
             const middleware = Context.unsafeGet(context, tag) as any
             const tail = buildChain(index + 1)
+            const middlewareSpanName = `${spanName}/middleware/${tag.key ?? "unknown"}`
+            const middlewareSpanOptions = {
+              attributes: {
+                ...spanAttributes,
+                middleware: tag.key ?? "unknown"
+              }
+            } as const
             if (tag.wrap) {
-              return middleware({ ...options, next: tail }) as any
+              return Effect_.withSpan(
+                middleware({ ...options, next: tail }) as any,
+                middlewareSpanName,
+                middlewareSpanOptions
+              ) as any
             }
             return tag.provides !== undefined
-              ? Effect_.provideServiceEffect(tail, tag.provides as any, middleware(options))
-              : Effect_.zipRight(middleware(options), tail)
+              ? Effect_.provideServiceEffect(
+                tail,
+                tag.provides as any,
+                Effect_.withSpan(
+                  middleware(options) as any,
+                  middlewareSpanName,
+                  middlewareSpanOptions
+                ) as any
+              )
+              : Effect_.zipRight(
+                Effect_.withSpan(
+                  middleware(options) as any,
+                  middlewareSpanName,
+                  middlewareSpanOptions
+                ),
+                tail
+              )
           }
           handlerEffect = buildChain(0)
         }
         return yield* handlerEffect
-      }).pipe(Effect_.provide(layer))
+      })
 
       // Create span and attach combined stacktrace (definition + call sites)
       let cache: false | string = false
@@ -191,7 +222,12 @@ const Proto = {
           return cache
         }
       }
-      const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, { captureStackTrace })
+      const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, {
+        captureStackTrace,
+        attributes: spanAttributes
+      }).pipe(
+        Effect_.provide(layer)
+      )
 
       /**
        * Workaround to handle redirect errors
@@ -206,26 +242,11 @@ const Proto = {
             onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
             onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
           })
-          // Append Effect Cause and captured stack to help Next.js display a richer stack
-          try {
-            const effectPretty = Cause.pretty(result.cause as any)
-            if (effectPretty && typeof effectPretty === "string") {
-              const section = `\n\n===== Effect Cause =====\n${effectPretty}\n=========================\n`
-              mappedError.stack = (mappedError.stack ?? `${mappedError.name}: ${mappedError.message}`) + section
-            }
-          } catch {
-            void 0
-          }
-          try {
-            const st = captureStackTrace?.()
-            if (st && typeof st === "string" && st.length > 0) {
-              const header = `\n--- Effect stacktrace (${spanName}) ---\n`
-              mappedError.stack = mappedError.stack
-                ? `${mappedError.stack}${header}${st}`
-                : `${header}${st}`
-            }
-          } catch {
-            void 0
+
+          // Replace the stack with the effect stacktrace
+          const effectPretty = Cause.pretty(result.cause as any)
+          if (effectPretty && typeof effectPretty === "string") {
+            mappedError.stack = effectPretty
           }
           throw mappedError
         }

@@ -25,7 +25,7 @@ describe("NextPage stacktrace", () => {
     expect(result).toBe("ok")
     const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n")
     expect(output).toContain("level=ERROR")
-    const spanName = "@mcrovero/effect-nextjs/NextPage/StackTraceTest"
+    const spanName = "StackTraceTest"
     const occurrences = (output.match(new RegExp(spanName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length
     expect(occurrences).toBeGreaterThanOrEqual(1)
     logSpy.mockRestore()
