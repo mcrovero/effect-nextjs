@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.5.0
+
+### Minor Changes
+
+- [`f64d06a`](https://github.com/mcrovero/effect-nextjs/commit/f64d06a9e34ef287c30501473bd2db2fad03b037) Thanks @mcrovero! - Added automatic trace spans and effect stacktrace
+
 ## 0.4.1
 
 ### Patch Changes
