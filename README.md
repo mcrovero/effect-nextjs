@@ -199,58 +199,6 @@ export const component = Next.make(AppLive)
   .build(() => Effect.succeed({ ok: true }))
 ```
 
-### Tracing (Next.js ↔ Effect)
+### OpenTelemetry
 
-The library automatically creates spans around pages, layouts, actions, server components, and middlewares. To connect Next.js OpenTelemetry spans with Effect spans, provide a custom `Tracer` that reads the currently active OTel span and uses it as the external parent for Effect spans.
-
-```ts
-import { Resource, Tracer as OtelTracer } from "@effect/opentelemetry"
-import { Next } from "@mcrovero/effect-nextjs"
-import { ProvideUserMiddleware, ProvideUserMiddlewareLive } from "./auth-middleware"
-
-import { context as otelContext, trace } from "@opentelemetry/api"
-import { Effect, Layer, Option, pipe, Schema, Tracer } from "effect"
-
-export const makeTracer: Effect.Effect<Tracer.Tracer, never, never> = Effect.gen(function* () {
-  const currentTracer = yield* Effect.tracer
-  return Tracer.make({
-    span(name, parent, context, links, startTime, kind) {
-      const active = trace.getSpan(otelContext.active())
-      const otelParent = active ? active.spanContext() : undefined
-
-      // If there's an active OTel span (The Next.js one), use it as the external parent for Effect spans
-      const externalParent = otelParent
-        ? Option.some(
-            Tracer.externalSpan({
-              spanId: otelParent.spanId,
-              traceId: otelParent.traceId,
-              sampled: (otelParent.traceFlags & 1) === 1,
-              context
-            })
-          )
-        : Option.none()
-
-      const effectiveParent = parent._tag === "Some" ? parent : externalParent
-
-      const span = currentTracer.span(name, effectiveParent, context, links, startTime, kind)
-      return span
-    },
-    context: currentTracer.context
-  })
-})
-
-export const layerTracer: Layer.Layer<never, never, never> = pipe(
-  makeTracer,
-  Effect.map(Layer.setTracer),
-  Layer.unwrapEffect
-)
-
-const tracerWithOtel = layerTracer.pipe(
-  Layer.provide(OtelTracer.layerGlobal.pipe(Layer.provide(Resource.layer({ serviceName: "next-app" }))))
-)
-
-const allLayers = Layer.mergeAll(/* your layers */)
-const allLayersWithTracer = Layer.mergeAll(allLayers, tracerWithOtel)
-
-const NextBase = Next.make(allLayersWithTracer)
-```
+The library automatically creates spans around pages, layouts, actions, server components, and middlewares.
