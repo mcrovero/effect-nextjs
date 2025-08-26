@@ -1,5 +1,5 @@
 /**
- * @since 1.0.0
+ * @since 0.5.0
  */
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
@@ -10,13 +10,13 @@ import * as Schema from "effect/Schema"
 import type { Mutable } from "effect/Types"
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category type ids
  */
 export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Middleware")
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category type ids
  */
 export type TypeId = typeof TypeId
@@ -37,7 +37,7 @@ type MiddlewareOptions = {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export interface NextMiddleware<Provides, E, R = never> {
@@ -45,7 +45,7 @@ export interface NextMiddleware<Provides, E, R = never> {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export interface NextMiddlewareWrap<Provides, Catches, R> {
@@ -55,7 +55,7 @@ export interface NextMiddlewareWrap<Provides, Catches, R> {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export interface Any {
@@ -63,7 +63,7 @@ export interface Any {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
@@ -76,12 +76,12 @@ export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
 >
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export declare namespace TagClass {
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type Provides<Options> = Options extends {
@@ -90,7 +90,7 @@ export declare namespace TagClass {
     : never
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type Service<Options> = Options extends {
@@ -99,7 +99,7 @@ export declare namespace TagClass {
     : void
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type FailureSchema<Options> = Options extends {
@@ -108,7 +108,7 @@ export declare namespace TagClass {
     : typeof Schema.Never
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type Failure<Options> = Options extends {
@@ -117,25 +117,25 @@ export declare namespace TagClass {
     : never
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type FailureContext<Options> = Schema.Schema.Context<FailureSchema<Options>>
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type FailureService<Options> = Failure<Options>
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type Wrap<Options> = Options extends { readonly wrap: true } ? true : false
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type CatchesSchema<Options> = Wrap<Options> extends true
@@ -143,13 +143,13 @@ export declare namespace TagClass {
     : typeof Schema.Never
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type CatchesValue<Options> = CatchesSchema<Options> extends Schema.Schema<infer A, any, any> ? A : never
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export type ReturnsSchema<Options> = Wrap<Options> extends true
@@ -157,7 +157,7 @@ export declare namespace TagClass {
     : typeof Schema.Never
 
   /**
-   * @since 1.0.0
+   * @since 0.5.0
    * @category models
    */
   export interface Base<Self, Name extends string, Options, Service> extends Context.Tag<Self, Service> {
@@ -172,7 +172,7 @@ export declare namespace TagClass {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export interface TagClassAny extends Context.Tag<any, any> {
@@ -185,7 +185,7 @@ export interface TagClassAny extends Context.Tag<any, any> {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export interface TagClassAnyWithProps extends Context.Tag<any, any> {
@@ -198,7 +198,7 @@ export interface TagClassAnyWithProps extends Context.Tag<any, any> {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category tags
  */
 export const Tag = <Self>(): <
@@ -242,7 +242,7 @@ export const Tag = <Self>(): <
     }
   })
   TagClass_[TypeId] = TypeId
-  TagClass_.failure = options?.failure === undefined ? Schema.Never : options.failure // catches is only meaningful for wrapped middlewares; default to Schema.Never otherwise
+  TagClass_.failure = options?.failure === undefined ? Schema.Never : options.failure
   ;(TagClass_ as any).catches = options && (options as any).wrap === true && (options as any).catches !== undefined
     ? (options as any).catches
     : Schema.Never
@@ -256,23 +256,10 @@ export const Tag = <Self>(): <
   return TagClass as any
 }
 
-/**
- * Create a Layer for a middleware implementation that accurately carries the
- * runtime environment requirements of the middleware into the Layer's R.
- *
- * This ensures that, if your middleware implementation yields from other
- * services (e.g. `yield* Other`), the resulting Layer type will reflect that
- * requirement, e.g. `Layer.Layer<AuthMiddleware, never, Other>` instead of
- * `never`.
- *
- * @since 1.0.0
- * @category constructors
- */
 type InferRFromImpl<Impl> = Impl extends (options: any) => Effect.Effect<any, any, infer R> ? R : never
 
 type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer S> } ? S : never
 
-// Infer the error type from the tag's failure schema
 type FailureFromTag<M> = M extends { readonly failure: Schema.Schema<infer A, any, any> } ? A : never
 
 export function layer<
@@ -293,8 +280,5 @@ export function layer<
   tag: M,
   impl: Impl
 ): Layer.Layer<Context.Tag.Identifier<M>, never, Exclude<InferRFromImpl<Impl>, ProvidedService<M>>> {
-  // Read the required environment `R` at construction time to reflect it in the
-  // Layer type, while still returning the concrete middleware implementation.
-  // We rely on the overload signatures for the precise return `R` type.
   return Layer_.effect(tag as any, Effect_.as(Effect_.context<any>() as any, impl as any)) as any
 }

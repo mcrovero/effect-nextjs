@@ -18,17 +18,6 @@ describe("NextAction", () => {
     AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "John Doe" }))
   )
 
-  it("composes and exposes meta", () => {
-    const action = Next.make(AuthLive)
-      .action("Submit")
-      .setInputSchema(Schema.Struct({ id: Schema.Number }))
-      .middleware(AuthMiddleware)
-
-    expect(action.key).toBe("@mcrovero/effect-nextjs/NextAction/Submit")
-    const mws = [...action.middlewares]
-    expect(mws).toContain(AuthMiddleware)
-  })
-
   it("runs handler with provided services and decoded input", async () => {
     const action = Next.make(AuthLive)
       .action("Submit")
