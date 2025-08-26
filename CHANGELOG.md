@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.6.0
+
+### Minor Changes
+
+- [`024bdc0`](https://github.com/mcrovero/effect-nextjs/commit/024bdc03682591d527f2c104cc67f48819cbfd8d) Thanks @mcrovero! - Now uses ManagedRuntime to prevent layers from being provided multiple times
+
 ## 0.5.0
 
 ### Minor Changes
