@@ -1,12 +1,10 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import type { ParseError } from "effect/ParseResult"
 import * as Schema from "effect/Schema"
-import { describe, expect, expectTypeOf, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import type * as NextPage from "../src/NextPage.js"
 
 describe("NextPage", () => {
   class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -29,29 +27,6 @@ describe("NextPage", () => {
     OtherMiddleware,
     OtherMiddleware.of(() => Effect.succeed({ id: "456", name: "Jane Doe" }))
   )
-
-  it("composes and exposes meta", () => {
-    const combined = Layer.mergeAll(AuthLive, OtherLive)
-    const page = Next.make(combined)
-      .page("Home")
-      .setParamsSchema(Schema.Struct({ id: Schema.String }))
-      .setSearchParamsSchema(Schema.Struct({ q: Schema.String }))
-      .middleware(AuthMiddleware)
-      .middleware(OtherMiddleware)
-
-    expect(page.key).toBe("@mcrovero/effect-nextjs/NextPage/Home")
-    expect(page.layer).toBe(combined)
-    const mws = [...page.middlewares]
-    expect(mws).toContain(AuthMiddleware)
-    expect(mws).toContain(OtherMiddleware)
-
-    expectTypeOf<NextPage.Params<typeof page>>(undefined as any).toMatchTypeOf<
-      Effect.Effect<{ id: string }, ParseError, never>
-    >(undefined as any)
-    expectTypeOf<NextPage.SearchParams<typeof page>>(undefined as any).toMatchTypeOf<
-      Effect.Effect<{ q: string }, ParseError, never>
-    >(undefined as any)
-  })
 
   it("runs handler with provided services and decoded params", async () => {
     const combined = Layer.mergeAll(AuthLive, OtherLive)

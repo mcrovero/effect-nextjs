@@ -1,12 +1,14 @@
-import { Cause, Exit, type Layer } from "effect"
+import { Cause, Exit } from "effect"
 import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
+import type * as ManagedRuntime from "effect/ManagedRuntime"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
+import { createMiddlewareChain } from "./internal/MiddlewareChain.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -30,15 +32,16 @@ export interface AnyWithProps {
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
-  readonly layer: Layer.Layer<any, any, any>
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly inputSchema?: Schema.Schema.All
 }
 
-type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
+type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R extends
+  ManagedRuntime.ManagedRuntime<infer ROut, any> ? ROut : never
 
 export interface NextAction<
   in out Tag extends string,
-  in out L extends Layer.Layer<any, any, any>,
+  in out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
   out Middleware extends NextMiddleware.TagClassAny = never,
   in InputA = undefined
 > extends Pipeable {
@@ -48,22 +51,22 @@ export interface NextAction<
   readonly _tag: Tag
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly layer: L
+  readonly runtime: Runtime
   readonly inputSchema?: Schema.Schema.All
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
-  ): NextAction<Tag, L, Middleware | M, InputA>
+    middleware: Context_.Tag.Identifier<M> extends RuntimeSuccess<Runtime> ? M : never
+  ): NextAction<Tag, Runtime, Middleware | M, InputA>
 
-  setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
+  setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, Runtime, Middleware, S>
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
+    H extends BuildHandlerWithError<NextAction<Tag, Runtime, Middleware, InputA>, E>
   >(
     handler: H
   ): (
-    input: Input<NextAction<Tag, L, Middleware, InputA>>
+    input: Input<NextAction<Tag, Runtime, Middleware, InputA>>
   ) => Promise<(ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never)>
 }
 
@@ -72,7 +75,7 @@ export interface Any extends Pipeable {
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAny>
-  readonly layer: Layer.Layer<any, any, any>
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly inputSchema?: Schema.Schema.All
 }
 
@@ -84,7 +87,7 @@ const Proto = {
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
-      layer: this.layer,
+      runtime: this.runtime,
       middlewares: [...this.middlewares, middleware],
       ...(this.inputSchema !== undefined ? { inputSchema: this.inputSchema } as const : {})
     })
@@ -92,7 +95,7 @@ const Proto = {
   setInputSchema(this: AnyWithProps, schema: Schema.Schema.All) {
     const options = {
       _tag: this._tag,
-      layer: this.layer,
+      runtime: this.runtime,
       middlewares: this.middlewares,
       ...(schema !== undefined ? { inputSchema: schema } as const : {})
     }
@@ -104,7 +107,7 @@ const Proto = {
     handler: (ctx: any) => Promise<Effect<any, any, any>>
   ) {
     const middlewares = this.middlewares
-    const layer = this.layer
+    const runtime = this.runtime
     const inputSchema = this.inputSchema
     // Capture definition stack for tracing (definition site)
     const defLimit = (Error as any).stackTraceLimit
@@ -136,47 +139,14 @@ const Proto = {
         if (middlewares.length > 0) {
           const options = { callerKind: "action" as const, input: (payload as any).input }
           const tags = middlewares as ReadonlyArray<any>
-          const buildChain = (index: number): Effect<any, any, any> => {
-            if (index >= tags.length) {
-              return handlerEffect
-            }
-            const tag = tags[index] as any
-            const middleware = Context.unsafeGet(context, tag) as any
-            const tail = buildChain(index + 1)
-            const middlewareSpanName = `${spanName}/middleware/${tag.key ?? "unknown"}`
-            const middlewareSpanOptions = {
-              attributes: {
-                ...spanAttributes.attributes,
-                middleware: tag.key ?? "unknown"
-              }
-            } as const
-            if (tag.wrap) {
-              return Effect_.withSpan(
-                middleware({ ...options, next: tail }) as any,
-                middlewareSpanName,
-                middlewareSpanOptions
-              ) as any
-            }
-            return tag.provides !== undefined
-              ? Effect_.provideServiceEffect(
-                tail,
-                tag.provides as any,
-                Effect_.withSpan(
-                  middleware(options) as any,
-                  middlewareSpanName,
-                  middlewareSpanOptions
-                ) as any
-              )
-              : Effect_.zipRight(
-                Effect_.withSpan(
-                  middleware(options) as any,
-                  middlewareSpanName,
-                  middlewareSpanOptions
-                ),
-                tail
-              )
-          }
-          handlerEffect = buildChain(0)
+          handlerEffect = createMiddlewareChain(
+            tags,
+            (tag) => Context.unsafeGet(context, tag) as any,
+            handlerEffect,
+            spanName,
+            spanAttributes.attributes as any,
+            options
+          )
         }
         return yield* handlerEffect
       })
@@ -205,14 +175,12 @@ const Proto = {
       const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, {
         captureStackTrace,
         attributes: spanAttributes
-      }).pipe(
-        Effect_.provide(layer)
-      )
+      })
 
       /**
        * Workaround to handle redirect errors
        */
-      return Effect_.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
+      return runtime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
             onEmpty: () => new Error("empty"),
@@ -238,14 +206,14 @@ const Proto = {
 
 const makeProto = <
   const Tag extends string,
-  const L extends Layer.Layer<any, any, any>,
+  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly layer: L
+  readonly runtime: Runtime
   readonly middlewares: ReadonlyArray<Middleware>
   readonly inputSchema?: Schema.Schema.All
-}): NextAction<Tag, L, Middleware> => {
+}): NextAction<Tag, Runtime, Middleware> => {
   function NextAction() {}
   Object.setPrototypeOf(NextAction, Proto)
   Object.assign(NextAction, options)
@@ -259,14 +227,14 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
-  const L extends Layer.Layer<any, any, any>
+  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
 >(
   tag: Tag,
-  layer: L
-): NextAction<Tag, L> => {
+  runtime: Runtime
+): NextAction<Tag, Runtime> => {
   return makeProto({
     _tag: tag,
-    layer,
+    runtime,
     middlewares: [] as Array<never>
   }) as any
 }
@@ -275,7 +243,7 @@ export const make = <
  * @since 1.0.0
  * @category models
  */
-export type Middleware<R> = R extends NextAction<infer _Tag, infer _Layer, infer _Middleware>
+export type Middleware<R> = R extends NextAction<infer _Tag, infer _Runtime, infer _Middleware>
   ? Context_.Tag.Identifier<_Middleware>
   : never
 
@@ -289,9 +257,12 @@ export type HandlerFrom<P extends Any> = P extends Any ? ToHandlerFn<P> : never
  * @since 1.0.0
  * @category models
  */
-export type ExtractProvides<R extends Any> = R extends
-  NextAction<infer _Tag, infer _Layer, infer _Middleware, infer _InputA>
-  ? LayerSuccess<_Layer> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
+export type ExtractProvides<R extends Any> = R extends NextAction<
+  infer _Tag,
+  infer _Runtime,
+  infer _Middleware,
+  infer _InputA
+> ? RuntimeSuccess<_Runtime> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
 /**
@@ -316,7 +287,8 @@ export interface Handler<Tag extends string> {
  * @since 1.0.0
  * @category models
  */
-export type ToHandler<R extends Any> = R extends NextAction<infer _Tag, infer _Middleware> ? Handler<_Tag>
+export type ToHandler<R extends Any> = R extends NextAction<infer _Tag, infer _Runtime, infer _Middleware> ?
+  Handler<_Tag>
   : never
 
 /**
@@ -338,12 +310,12 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 ) => Effect<infer _A, infer _E, infer _R> ? ExcludeProvides<_R, P>
   : never
 
-export type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
+export type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Runtime, infer _Middleware, infer InputA> ?
   InputA extends Schema.Schema<infer _type, infer encoded, infer _c> ? encoded : unknown
   : never
 
 export type HandlerInputEffect<P extends Any> = P extends
-  NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
+  NextAction<infer _Tag, infer _Runtime, infer _Middleware, infer InputA> ?
   (InputA extends Schema.Schema<infer type, infer _encoded, infer _c> ? Effect<type, ParseError, never> : unknown)
   : never
 

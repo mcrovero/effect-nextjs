@@ -36,8 +36,10 @@ const CatchAllLive = NextMiddleware.layer(
 
 const app = Layer.mergeAll(CatchAllLive, ProvideUserLive)
 
-const page = Next.make(app)
-  .page("Home")
+const NextApp = Next.make(app)
+const BasePage = NextApp.page("Home")
+
+const page = BasePage
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .middleware(ProvideUser)
   .middleware(CatchAll)

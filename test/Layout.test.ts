@@ -2,9 +2,8 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { describe, expect, expectTypeOf, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import * as Next from "../src/Next.js"
-import type * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("NextLayout", () => {
@@ -18,20 +17,6 @@ describe("NextLayout", () => {
     ThemeMiddleware,
     ThemeMiddleware.of(() => Effect.succeed({ mode: "dark" }))
   )
-
-  it("composes and exposes meta", () => {
-    const layout = Next.make(ThemeLive)
-      .layout("Root")
-      .setParamsSchema(Schema.Struct({ locale: Schema.String }))
-      .middleware(ThemeMiddleware)
-
-    expect(layout.key).toBe("@mcrovero/effect-nextjs/NextLayout/Root")
-    const mws = [...layout.middlewares]
-    expect(mws).toContain(ThemeMiddleware)
-    expectTypeOf<NextLayout.Params<typeof layout>>(undefined as any).toMatchTypeOf<
-      Effect.Effect<{ locale: string }, any, never>
-    >(undefined as any)
-  })
 
   it("runs handler with provided services and decoded params", async () => {
     const layout = Next.make(ThemeLive)

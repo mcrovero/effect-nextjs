@@ -1,13 +1,15 @@
-import { Cause, Exit, type Layer } from "effect"
+import { Cause, Exit } from "effect"
 import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
+import type * as ManagedRuntime from "effect/ManagedRuntime"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
+import { createMiddlewareChain } from "./internal/MiddlewareChain.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -44,15 +46,16 @@ export interface AnyWithProps {
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
-  readonly layer: Layer.Layer<any, any, any>
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly paramsSchema?: AnySchema
 }
 
-type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
+type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R extends
+  ManagedRuntime.ManagedRuntime<infer ROut, any> ? ROut : never
 
 export interface NextLayout<
   in out Tag extends string,
-  in out L extends Layer.Layer<any, any, any>,
+  in out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
   out Middleware extends NextMiddleware.TagClassAny = never,
   out ParamsA = undefined
 > extends Pipeable {
@@ -62,18 +65,18 @@ export interface NextLayout<
   readonly _tag: Tag
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly layer: L
+  readonly runtime: Runtime
   readonly paramsSchema?: AnySchema
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
-  ): NextLayout<Tag, L, Middleware | M, ParamsA>
+    middleware: Context_.Tag.Identifier<M> extends RuntimeSuccess<Runtime> ? M : never
+  ): NextLayout<Tag, Runtime, Middleware | M, ParamsA>
 
-  setParamsSchema<S extends AnySchema>(schema: S): NextLayout<Tag, L, Middleware, S["Type"]>
+  setParamsSchema<S extends AnySchema>(schema: S): NextLayout<Tag, Runtime, Middleware, S["Type"]>
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextLayout<Tag, L, Middleware, ParamsA>, E>
+    H extends BuildHandlerWithError<NextLayout<Tag, Runtime, Middleware, ParamsA>, E>
   >(
     handler: H
   ): (
@@ -89,7 +92,7 @@ export interface Any extends Pipeable {
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAny>
-  readonly layer: Layer.Layer<any, any, any>
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly paramsSchema?: AnySchema
 }
 
@@ -101,14 +104,14 @@ const Proto = {
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
-      layer: this.layer,
+      runtime: this.runtime,
       middlewares: [...this.middlewares, middleware]
     })
   },
   setParamsSchema(this: AnyWithProps, schema: AnySchema) {
     const options = {
       _tag: this._tag,
-      layer: this.layer,
+      runtime: this.runtime,
       middlewares: this.middlewares,
       ...(schema !== undefined ? { paramsSchema: schema } as const : {})
     }
@@ -120,7 +123,7 @@ const Proto = {
     handler: (ctx: any) => Effect<any, any, any>
   ) {
     const middlewares = this.middlewares
-    const layer = this.layer
+    const runtime = this.runtime
     const paramsSchema = this.paramsSchema
     // Capture definition stack for tracing (definition site)
     const defLimit = (Error as any).stackTraceLimit
@@ -156,47 +159,14 @@ const Proto = {
         if (middlewares.length > 0) {
           const options = { callerKind: "layout" as const, params: rawParams, children: props?.children }
           const tags = middlewares as ReadonlyArray<any>
-          const buildChain = (index: number): Effect<any, any, any> => {
-            if (index >= tags.length) {
-              return handlerEffect
-            }
-            const tag = tags[index] as any
-            const middleware = Context.unsafeGet(context, tag) as any
-            const tail = buildChain(index + 1)
-            const middlewareSpanName = `${spanName}/middleware/${tag.key ?? "unknown"}`
-            const middlewareSpanOptions = {
-              attributes: {
-                ...spanAttributes,
-                middleware: tag.key ?? "unknown"
-              }
-            } as const
-            if (tag.wrap) {
-              return Effect_.withSpan(
-                middleware({ ...options, next: tail }) as any,
-                middlewareSpanName,
-                middlewareSpanOptions
-              ) as any
-            }
-            return tag.provides !== undefined
-              ? Effect_.provideServiceEffect(
-                tail,
-                tag.provides as any,
-                Effect_.withSpan(
-                  middleware(options) as any,
-                  middlewareSpanName,
-                  middlewareSpanOptions
-                ) as any
-              )
-              : Effect_.zipRight(
-                Effect_.withSpan(
-                  middleware(options) as any,
-                  middlewareSpanName,
-                  middlewareSpanOptions
-                ),
-                tail
-              )
-          }
-          handlerEffect = buildChain(0)
+          handlerEffect = createMiddlewareChain(
+            tags,
+            (tag) => Context.unsafeGet(context, tag) as any,
+            handlerEffect,
+            spanName,
+            spanAttributes,
+            options
+          )
         }
         return yield* handlerEffect
       })
@@ -225,14 +195,12 @@ const Proto = {
       const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, {
         captureStackTrace,
         attributes: spanAttributes
-      }).pipe(
-        Effect_.provide(layer)
-      )
+      })
 
       /**
        * Workaround to handle redirect errors
        */
-      return Effect_.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
+      return runtime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
             onEmpty: () => new Error("empty"),
@@ -258,14 +226,14 @@ const Proto = {
 
 const makeProto = <
   const Tag extends string,
-  const L extends Layer.Layer<any, any, any>,
+  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly layer: L
+  readonly runtime: Runtime
   readonly middlewares: ReadonlyArray<Middleware>
   readonly paramsSchema?: AnySchema
-}): NextLayout<Tag, L, Middleware> => {
+}): NextLayout<Tag, Runtime, Middleware> => {
   function NextLayout() {}
   Object.setPrototypeOf(NextLayout, Proto)
   Object.assign(NextLayout, options)
@@ -279,14 +247,14 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
-  const L extends Layer.Layer<any, any, any>
+  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
 >(
   tag: Tag,
-  layer: L
-): NextLayout<Tag, L> => {
+  runtime: Runtime
+): NextLayout<Tag, Runtime> => {
   return makeProto({
     _tag: tag,
-    layer,
+    runtime,
     middlewares: [] as Array<never>
   }) as any
 }
@@ -295,7 +263,7 @@ export const make = <
  * @since 1.0.0
  * @category models
  */
-export type Middleware<R> = R extends NextLayout<infer _Tag, infer _Layer, infer _Middleware>
+export type Middleware<R> = R extends NextLayout<infer _Tag, infer _Runtime, infer _Middleware>
   ? Context_.Tag.Identifier<_Middleware>
   : never
 
@@ -310,8 +278,8 @@ export type HandlerFrom<P extends Any> = P extends Any ? ToHandlerFn<P> : never
  * @category models
  */
 export type ExtractProvides<R extends Any> = R extends
-  NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA>
-  ? LayerSuccess<_Layer> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
+  NextLayout<infer _Tag, infer _Runtime, infer _Middleware, infer _ParamsA>
+  ? RuntimeSuccess<_Runtime> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
 /**
@@ -336,7 +304,8 @@ export interface Handler<Tag extends string> {
  * @since 1.0.0
  * @category models
  */
-export type ToHandler<R extends Any> = R extends NextLayout<infer _Tag, infer _Middleware> ? Handler<_Tag>
+export type ToHandler<R extends Any> = R extends NextLayout<infer _Tag, infer _Runtime, infer _Middleware> ?
+  Handler<_Tag>
   : never
 
 /**
@@ -359,7 +328,8 @@ export type HandlerContext<P extends Any, Handler> = Handler extends (
 ) => Effect<infer _A, infer _E, infer _R> ? ExcludeProvides<_R, P>
   : never
 
-export type Params<P extends Any> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA> ?
+export type Params<P extends Any> = P extends
+  NextLayout<infer _Tag, infer _Runtime, infer _Middleware, infer _ParamsA> ?
   _ParamsA extends undefined ? Effect_.Effect<Readonly<Record<string, string | undefined>>, never, never>
   : Effect_.Effect<_ParamsA, ParseError, never>
   : never
