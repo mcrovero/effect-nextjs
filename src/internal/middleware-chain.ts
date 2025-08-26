@@ -3,7 +3,7 @@ import * as Effect_ from "effect/Effect"
 import type * as NextMiddleware from "../NextMiddleware.js"
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category utils
  */
 export type MiddlewareChainOptionsBase =
@@ -26,7 +26,7 @@ export type MiddlewareChainOptionsBase =
   }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category utils
  */
 export const createMiddlewareChain = (

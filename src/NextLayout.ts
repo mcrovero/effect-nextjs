@@ -9,23 +9,23 @@ import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
-import { createMiddlewareChain } from "./internal/MiddlewareChain.js"
+import { createMiddlewareChain } from "./internal/middleware-chain.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category type ids
  */
 export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Layout")
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category type ids
  */
 export type TypeId = typeof TypeId
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category constructors
  */
 export interface AnySchema extends Pipeable {
@@ -38,7 +38,7 @@ export interface AnySchema extends Pipeable {
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
 export interface AnyWithProps {
@@ -242,7 +242,7 @@ const makeProto = <
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category constructors
  */
 export const make = <
@@ -260,72 +260,12 @@ export const make = <
 }
 
 /**
- * @since 1.0.0
+ * @since 0.5.0
  * @category models
  */
-export type Middleware<R> = R extends NextLayout<infer _Tag, infer _Runtime, infer _Middleware>
-  ? Context_.Tag.Identifier<_Middleware>
-  : never
-
-/**
- * @since 1.0.0
- * @category groups
- */
-export type HandlerFrom<P extends Any> = P extends Any ? ToHandlerFn<P> : never
-
-/**
- * @since 1.0.0
- * @category models
- */
-export type ExtractProvides<R extends Any> = R extends
+type ExtractProvides<R extends Any> = R extends
   NextLayout<infer _Tag, infer _Runtime, infer _Middleware, infer _ParamsA>
   ? RuntimeSuccess<_Runtime> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
-  : never
-
-/**
- * @since 1.0.0
- * @category models
- */
-export type ExcludeProvides<Env, R extends Any> = Exclude<Env, ExtractProvides<R>>
-
-/**
- * Represents an implemented layout.
- *
- * @since 1.0.0
- * @category models
- */
-export interface Handler<Tag extends string> {
-  readonly _: unique symbol
-  readonly tag: Tag
-  readonly handler: (request: any) => Effect<any, any>
-}
-
-/**
- * @since 1.0.0
- * @category models
- */
-export type ToHandler<R extends Any> = R extends NextLayout<infer _Tag, infer _Runtime, infer _Middleware> ?
-  Handler<_Tag>
-  : never
-
-/**
- * @since 1.0.0
- * @category models
- */
-export type ToHandlerFn<R extends Any> = (
-  request: {
-    readonly params: Params<R>
-    readonly children: any
-  }
-) => Effect<any, never, ExtractProvides<R>>
-
-/**
- * @since 1.0.0
- * @category groups
- */
-export type HandlerContext<P extends Any, Handler> = Handler extends (
-  ...args: any
-) => Effect<infer _A, infer _E, infer _R> ? ExcludeProvides<_R, P>
   : never
 
 export type Params<P extends Any> = P extends
@@ -334,29 +274,12 @@ export type Params<P extends Any> = P extends
   : Effect_.Effect<_ParamsA, ParseError, never>
   : never
 
-// Error typing helpers for build
-type InferSchemaType<S> = S extends Schema.Schema<infer A, any, any> ? A : never
-
-export type MiddlewareErrors<M> = M extends NextMiddleware.TagClassAny ? InferSchemaType<M["failure"]>
-  : never
-
-export type HandlerError<H> = H extends (
-  ...args: any
-) => Effect<infer _A, infer _E, any> ? _E :
-  never
-
 // Allowed errors are from wrapped middlewares' catches schema (otherwise never)
-export type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
-  : never
-
-// Allow handler error to be E if and only if it's assignable to Allowed
-export type AllowedHandler<H, Allowed> = H extends (
-  ...args: any
-) => Effect<infer _X, infer E, any> ? (E extends Allowed | ParseError ? H : never)
+type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
   : never
 
 // Helper to constrain a layout handler's error to an allowed schema-derived type
-export type BuildHandlerWithError<P extends Any, E> = (
+type BuildHandlerWithError<P extends Any, E> = (
   request: {
     readonly params: Params<P>
     readonly children: any
