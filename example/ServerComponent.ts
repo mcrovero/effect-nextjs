@@ -16,7 +16,7 @@ const TimeLive = Layer.succeed(
   TimeMiddleware.of(() => Effect.succeed({ now: Date.now() }))
 )
 
-export default Next.make(TimeLive)
+export default Next.make("Base", TimeLive)
   .component("ServerInfo")
   .middleware(TimeMiddleware)
   .build(({ time }: { time: { now: number } }) =>

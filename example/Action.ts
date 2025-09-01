@@ -22,7 +22,7 @@ const AuthLive = Layer.succeed(
   AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "other" }))
 )
 
-const action = Next.make(AuthLive).action("Submit")
+const action = Next.make("Base", AuthLive).action("Submit")
   .setInputSchema(
     Schema.Struct({
       id: Schema.Number

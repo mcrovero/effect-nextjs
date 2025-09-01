@@ -88,12 +88,19 @@ const makeProto = <
 >(options: {
   readonly layer: Layer
   readonly runtime: Runtime
+  readonly key: string
 }): Next<Layer> => {
   function Next() {}
   Object.setPrototypeOf(Next, Proto)
   Object.assign(Next, options)
-  Next.key = `@mcrovero/effect-nextjs/Next`
+  Next.key = options.key
   return Next as any
+}
+
+declare global {
+  var __effect_nextjs_runtime_registry__:
+    | Record<string, { dispose: () => Promise<void> } | undefined>
+    | undefined
 }
 
 /**
@@ -103,11 +110,31 @@ const makeProto = <
 export const make = <
   const Layer extends Layer.Layer<any, any, never>
 >(
+  key: string,
   layer: Layer
 ): Next<Layer> => {
+  const isDev = process.env.NODE_ENV !== "production"
+
+  if (isDev && key) {
+    const registry =
+      (globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {})
+    const previous = registry[key]
+    if (previous) {
+      // fire-and-forget: ensure previous scoped resources/fibers are finalized
+      void previous.dispose()
+    }
+  }
+
   const runtime = ManagedRuntime.make(layer) as RuntimeFromLayer<Layer>
-  return makeProto({
+  const next = makeProto({
     layer,
-    runtime
+    runtime,
+    key
   }) as any
+  if (isDev && key) {
+    const registry =
+      (globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {})
+    registry[key] = (next as any).runtime
+  }
+  return next
 }

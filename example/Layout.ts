@@ -28,7 +28,7 @@ const CatchLive = Layer.succeed(
 
 const merged = Layer.mergeAll(ThemeLive, CatchLive)
 
-const layout = Next.make(merged)
+const layout = Next.make("Base", merged)
   .layout("RootLayout")
   .setParamsSchema(Schema.Struct({ locale: Schema.String }))
   .middleware(CatchMiddleware)

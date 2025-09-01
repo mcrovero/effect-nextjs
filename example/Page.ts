@@ -36,7 +36,7 @@ const CatchAllLive = NextMiddleware.layer(
 
 const app = Layer.mergeAll(CatchAllLive, ProvideUserLive)
 
-const NextApp = Next.make(app)
+const NextApp = Next.make("Base", app)
 const BasePage = NextApp.page("Home")
 
 const page = BasePage

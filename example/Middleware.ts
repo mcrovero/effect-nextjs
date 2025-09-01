@@ -45,7 +45,7 @@ const _NotWrappedLive = Layer.succeed(
 
 const ProdLive = Layer.mergeAll(_WrappedLive, _NotWrappedLive)
 
-const _page = Next.make(ProdLive).page("HomePage")
+const _page = Next.make("Base", ProdLive).page("HomePage")
   .setParamsSchema(Schema.Struct({
     id: Schema.String
   }))
