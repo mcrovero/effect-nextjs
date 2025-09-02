@@ -12,7 +12,7 @@ describe("NextPage stacktrace", () => {
       class Dummy extends Context.Tag("Dummy")<Dummy, object>() {}
       const AppLive: Layer.Layer<Dummy> = Layer.succeed(Dummy, {})
 
-      const page = NextPage.make("Base", AppLive)
+      const page = NextPage.make("StackTraceTest", AppLive)
 
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
       try {

@@ -16,9 +16,15 @@ import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
  * @since 0.5.0
+ * @category constants
+ */
+const NextPageSymbolKey = "@mcrovero/effect-nextjs/NextPage"
+
+/**
+ * @since 0.5.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/NextPage")
+export const TypeId: unique symbol = Symbol.for(NextPageSymbolKey)
 
 /**
  * @since 0.5.0
@@ -244,7 +250,7 @@ const Proto = {
        * In development we use global registry to get the runtime
        * to support hot-reloading.
        */
-      const actualRuntime = getRuntime(this._tag, runtime)
+      const actualRuntime = getRuntime(`${NextPageSymbolKey}/${this._tag}`, runtime)
 
       // Workaround to handle redirect errors
       return actualRuntime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
@@ -284,7 +290,7 @@ const makeProto = <
   function NextPage() {}
   Object.setPrototypeOf(NextPage, Proto)
   Object.assign(NextPage, options)
-  NextPage.key = `${options._tag}`
+  NextPage.key = `${NextPageSymbolKey}/${options._tag}`
   return NextPage as any
 }
 
@@ -298,8 +304,9 @@ export const make = <
 >(tag: Tag, layer: L): NextPage<Tag, L> => {
   const runtime = ManagedRuntime.make(layer)
 
+  const key = `${NextPageSymbolKey}/${tag}`
   // Register the runtime in the global registry for development mode (HMR support)
-  setRuntime(tag, runtime)
+  setRuntime(key, runtime)
 
   return makeProto({
     _tag: tag,
