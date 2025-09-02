@@ -3,14 +3,15 @@ import type * as Context_ from "effect/Context"
 import * as Context from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
-import type * as ManagedRuntime from "effect/ManagedRuntime"
+import type * as Layer from "effect/Layer"
+import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
-import { getRuntime } from "./internal/runtime-registry.js"
+import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -55,7 +56,6 @@ export interface Any extends Pipeable {
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
-  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
@@ -63,8 +63,7 @@ export interface AnyWithProps {
   readonly searchParamsSchema?: AnySchema
 }
 
-type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R extends
-  ManagedRuntime.ManagedRuntime<infer ROut, any> ? ROut : never
+type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
 /**
  * @since 0.5.0
@@ -72,7 +71,7 @@ type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R exten
  */
 export interface NextPage<
   in out Tag extends string,
-  out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  out L extends Layer.Layer<any, any, any>,
   out Middleware extends NextMiddleware.TagClassAny = never,
   out ParamsA = undefined,
   out SearchParamsA = undefined
@@ -81,23 +80,22 @@ export interface NextPage<
 
   readonly [TypeId]: TypeId
   readonly _tag: Tag
-  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    middleware: Context_.Tag.Identifier<M> extends RuntimeSuccess<Runtime> ? M : never
-  ): NextPage<Tag, Runtime, Middleware | M, ParamsA, SearchParamsA>
+    middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
+  ): NextPage<Tag, L, Middleware | M, ParamsA, SearchParamsA>
 
-  setParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, Runtime, Middleware, S["Type"], SearchParamsA>
-  setSearchParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, Runtime, Middleware, ParamsA, S["Type"]>
+  setParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, S["Type"], SearchParamsA>
+  setSearchParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, ParamsA, S["Type"]>
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextPage<Tag, Runtime, Middleware, ParamsA, SearchParamsA>, E>
+    H extends BuildHandlerWithError<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
   >(
     handler: H
   ): (
@@ -120,7 +118,6 @@ const Proto = {
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
-      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: [...this.middlewares, middleware],
       ...(this.paramsSchema !== undefined ? { paramsSchema: this.paramsSchema } as const : {}),
@@ -130,7 +127,6 @@ const Proto = {
   setParamsSchema(this: AnyWithProps, schema: AnySchema) {
     return makeProto({
       _tag: this._tag,
-      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: this.middlewares,
       ...(schema !== undefined ? { paramsSchema: schema } as const : {}),
@@ -142,7 +138,6 @@ const Proto = {
   setSearchParamsSchema(this: AnyWithProps, schema: AnySchema) {
     return makeProto({
       _tag: this._tag,
-      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: this.middlewares,
       ...(this.paramsSchema !== undefined ? { paramsSchema: this.paramsSchema } as const : {}),
@@ -249,7 +244,7 @@ const Proto = {
        * In development we use global registry to get the runtime
        * to support hot-reloading.
        */
-      const actualRuntime = getRuntime(this._runtimeTag, runtime)
+      const actualRuntime = getRuntime(this._tag, runtime)
 
       // Workaround to handle redirect errors
       return actualRuntime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
@@ -277,21 +272,19 @@ const Proto = {
 }
 const makeProto = <
   const Tag extends string,
-  const RuntimeTag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  const L extends Layer.Layer<any, any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly _runtimeTag: RuntimeTag
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly middlewares: ReadonlyArray<Middleware>
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
-}): NextPage<Tag, Runtime, Middleware> => {
+}): NextPage<Tag, L, Middleware> => {
   function NextPage() {}
   Object.setPrototypeOf(NextPage, Proto)
   Object.assign(NextPage, options)
-  NextPage.key = `${options._runtimeTag}/${options._tag}`
+  NextPage.key = `${options._tag}`
   return NextPage as any
 }
 
@@ -301,16 +294,15 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
-  const RuntimeTag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
->(
-  tag: Tag,
-  runtimeTag: RuntimeTag,
-  runtime: Runtime
-): NextPage<Tag, Runtime> => {
+  const L extends Layer.Layer<any, any, never>
+>(tag: Tag, layer: L): NextPage<Tag, L> => {
+  const runtime = ManagedRuntime.make(layer)
+
+  // Register the runtime in the global registry for development mode (HMR support)
+  setRuntime(tag, runtime)
+
   return makeProto({
     _tag: tag,
-    _runtimeTag: runtimeTag,
     runtime,
     middlewares: [] as Array<never>
   })
@@ -322,12 +314,12 @@ export const make = <
  */
 export type ExtractProvides<R extends Any> = R extends NextPage<
   infer _Tag,
-  infer _Runtime,
+  infer _Layer,
   infer _Middleware,
   infer _ParamsA,
   infer _SearchParamsA
 > ?
-    | RuntimeSuccess<_Runtime>
+    | LayerSuccess<_Layer>
     | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
@@ -338,13 +330,13 @@ export type ExtractProvides<R extends Any> = R extends NextPage<
 export type ExcludeProvides<Env, R extends Any> = Exclude<Env, ExtractProvides<R>>
 
 export type Params<P extends Any> = P extends
-  NextPage<infer _Tag, infer _Runtime, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
   _ParamsA extends undefined ? Effect<Readonly<Record<string, string | undefined>>, never, never>
   : Effect<_ParamsA, ParseError, never>
   : never
 
 export type SearchParams<P extends Any> = P extends
-  NextPage<infer _Tag, infer _Runtime, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
+  NextPage<infer _Tag, infer _Layer, infer _Middleware, infer _ParamsA, infer _SearchParamsA> ?
   _SearchParamsA extends undefined ? Effect<Readonly<Record<string, string | undefined>>, never, never>
   : Effect<_SearchParamsA, ParseError, never>
   : never

@@ -3,12 +3,13 @@ import type * as Context_ from "effect/Context"
 import * as Context from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
-import type * as ManagedRuntime from "effect/ManagedRuntime"
+import type * as Layer from "effect/Layer"
+import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
-import { getRuntime } from "./internal/runtime-registry.js"
+import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -36,41 +37,38 @@ export interface Any extends Pipeable {
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
-  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
 }
 
-type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R extends
-  ManagedRuntime.ManagedRuntime<infer ROut, any> ? ROut : never
+type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
 export interface NextServerComponent<
   in out Tag extends string,
-  out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  out L extends Layer.Layer<any, any, any>,
   out Middleware extends NextMiddleware.TagClassAny = never
 > extends Pipeable {
   new(_: never): object
 
   readonly [TypeId]: TypeId
   readonly _tag: Tag
-  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    middleware: Context_.Tag.Identifier<M> extends RuntimeSuccess<Runtime> ? M : never
-  ): NextServerComponent<Tag, Runtime, Middleware | M>
+    middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
+  ): NextServerComponent<Tag, L, Middleware | M>
 
   // props-less variant
   build<Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, Runtime, Middleware>>>
+    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
   ): () => Promise<Out | WrappedReturns<Middleware>>
 
   // props variant (infers Props from handler parameter)
   build<Props, Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, Runtime, Middleware>>>
+    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
   ): (props: Props) => Promise<Out | WrappedReturns<Middleware>>
 }
 
@@ -82,7 +80,6 @@ const Proto = {
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
-      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: [...this.middlewares, middleware]
     })
@@ -158,7 +155,7 @@ const Proto = {
        * In development we use global registry to get the runtime
        * to support hot-reloading.
        */
-      const actualRuntime = getRuntime(this._runtimeTag, runtime)
+      const actualRuntime = getRuntime(this._tag, runtime)
 
       /**
        * Workaround to handle redirect errors
@@ -189,19 +186,17 @@ const Proto = {
 
 const makeProto = <
   const Tag extends string,
-  const RuntimeTag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  const L extends Layer.Layer<any, any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly _runtimeTag: RuntimeTag
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly middlewares: ReadonlyArray<Middleware>
-}): NextServerComponent<Tag, Runtime, Middleware> => {
+}): NextServerComponent<Tag, L, Middleware> => {
   function NextServerComponent() {}
   Object.setPrototypeOf(NextServerComponent, Proto)
   Object.assign(NextServerComponent, options)
-  NextServerComponent.key = `${options._runtimeTag}/${options._tag}`
+  NextServerComponent.key = `${options._tag}`
   return NextServerComponent as any
 }
 
@@ -211,16 +206,15 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
-  const RuntimeTag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
->(
-  tag: Tag,
-  runtimeTag: RuntimeTag,
-  runtime: Runtime
-): NextServerComponent<Tag, Runtime> => {
+  const L extends Layer.Layer<any, any, never>
+>(tag: Tag, layer: L): NextServerComponent<Tag, L> => {
+  const runtime = ManagedRuntime.make(layer)
+
+  // Register the runtime in the global registry for development mode (HMR support)
+  setRuntime(tag, runtime)
+
   return makeProto({
     _tag: tag,
-    _runtimeTag: runtimeTag,
     runtime,
     middlewares: [] as Array<never>
   })
@@ -230,8 +224,13 @@ export const make = <
  * @since 0.5.0
  * @category models
  */
-type ExtractProvides<R extends Any> = R extends NextServerComponent<infer _Tag, infer _Runtime, infer _Middleware>
-  ? RuntimeSuccess<_Runtime> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
+type ExtractProvides<R extends Any> = R extends NextServerComponent<
+  infer _Tag,
+  infer _Layer,
+  infer _Middleware
+> ?
+    | LayerSuccess<_Layer>
+    | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
 type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A

@@ -1,7 +1,7 @@
 import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Next from "../src/Next.js"
+import * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 // A simple context tag for the current user
@@ -22,7 +22,7 @@ const AuthLive = Layer.succeed(
   AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "other" }))
 )
 
-const action = Next.make("Base", AuthLive).action("Submit")
+const action = NextAction.make("Base", AuthLive)
   .setInputSchema(
     Schema.Struct({
       id: Schema.Number

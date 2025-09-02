@@ -4,7 +4,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { vi } from "vitest"
-import * as Next from "../src/Next.js"
+import * as NextPage from "../src/NextPage.js"
 
 describe("NextPage stacktrace", () => {
   it.effect("logs enhanced stack including span name twice (definition and call)", () =>
@@ -12,8 +12,7 @@ describe("NextPage stacktrace", () => {
       class Dummy extends Context.Tag("Dummy")<Dummy, object>() {}
       const AppLive: Layer.Layer<Dummy> = Layer.succeed(Dummy, {})
 
-      const page = Next.make("Base", AppLive)
-        .page("StackTraceTest")
+      const page = NextPage.make("Base", AppLive)
 
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
       try {

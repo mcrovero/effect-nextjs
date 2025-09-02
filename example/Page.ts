@@ -2,8 +2,8 @@ import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { ParseError } from "effect/ParseResult"
-import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextPage from "../src/NextPage.js"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
@@ -36,8 +36,7 @@ const CatchAllLive = NextMiddleware.layer(
 
 const app = Layer.mergeAll(CatchAllLive, ProvideUserLive)
 
-const NextApp = Next.make("Base", app)
-const BasePage = NextApp.page("Home")
+const BasePage = NextPage.make("Home", app)
 
 const page = BasePage
   .setParamsSchema(Schema.Struct({ id: Schema.String }))

@@ -4,7 +4,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Next from "../src/Next.js"
+import * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("NextLayout", () => {
@@ -21,8 +21,7 @@ describe("NextLayout", () => {
 
   it.effect("runs handler with provided services and decoded params", () =>
     Effect.gen(function*() {
-      const layout = Next.make("Base", ThemeLive)
-        .layout("Root")
+      const layout = NextLayout.make("Root", ThemeLive)
         .setParamsSchema(Schema.Struct({ locale: Schema.String }))
         .middleware(ThemeMiddleware)
 

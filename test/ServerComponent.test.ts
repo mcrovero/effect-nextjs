@@ -3,8 +3,8 @@ import { assertTrue } from "@effect/vitest/utils"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextServerComponent from "../src/NextServerComponent.js"
 
 describe("NextServerComponent", () => {
   class ServerTime extends Context.Tag("ServerTime")<ServerTime, { now: number }>() {}
@@ -20,8 +20,7 @@ describe("NextServerComponent", () => {
 
   it.effect("runs handler with provided services", () =>
     Effect.gen(function*() {
-      const component = Next.make("Base", TimeLive)
-        .component("ServerInfo")
+      const component = NextServerComponent.make("Base", TimeLive)
         .middleware(TimeMiddleware)
 
       const result = yield* Effect.promise(() =>

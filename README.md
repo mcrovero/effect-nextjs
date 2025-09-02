@@ -23,7 +23,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // A simple service
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -41,8 +41,7 @@ export const AuthLive = NextMiddleware.layer(AuthMiddleware, () => Effect.succee
 const AppLive = Layer.mergeAll(AuthLive)
 
 // Create a typed page handler
-export const page = Next.make(AppLive)
-  .page("HomePage")
+export const page = NextPage.make("HomePage", AppLive)
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .middleware(AuthMiddleware)
   .build(({ params }) =>
@@ -73,7 +72,7 @@ export default async function Page(props: {
 
 Notes
 
-- Use `.layout(tag)`, `.component(tag)`, and `.action(tag)` for layouts, server components, and server actions.
+- Use `NextLayout.make(tag, layer)`, `NextServerComponent.make(tag, layer)`, and `NextAction.make(tag, layer)` for layouts, server components, and server actions.
 - Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.build(...)` for actions must be `async`, returning a Promise of an Effect.
@@ -88,7 +87,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // Dependencies
 export class Other extends Context.Tag("Other")<Other, { id: string; name: string }>() {}
@@ -113,8 +112,7 @@ const OtherLive = Layer.succeed(Other, { id: "999", name: "Jane" })
 const AppLive = Layer.mergeAll(OtherLive, AuthLive)
 
 // Use in a page
-const page = Next.make(AppLive)
-  .page("Home")
+const page = NextPage.make("Home", AppLive)
   .middleware(AuthMiddleware)
   .build(() =>
     Effect.gen(function* () {
@@ -133,7 +131,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
@@ -156,8 +154,7 @@ const WrappedLive = Layer.succeed(
 )
 
 const AppLive = Layer.mergeAll(WrappedLive)
-const page = Next.make(AppLive)
-  .page("Home")
+const page = NextPage.make("Home", AppLive)
   .middleware(Wrapped)
   .build(() => Effect.succeed("ok"))
 ```
@@ -168,35 +165,29 @@ Use `Schema` to validate/transform values automatically before your handler runs
 
 ```ts
 import * as Schema from "effect/Schema"
-import { Next } from "@mcrovero/effect-nextjs"
+import { NextPage, NextAction, NextServerComponent } from "@mcrovero/effect-nextjs"
 
 // Params and searchParams (Page)
-const page = Next.make(AppLive)
-  .page("Home")
+const page = NextPage.make("Home", AppLive)
   .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .setSearchParamsSchema(Schema.Struct({ q: Schema.optional(Schema.String) }))
   .build(({ params, searchParams }) => Effect.succeed({ params, searchParams }))
 
 // Input (Action)
 // IMPORTANT: The action handler must be async because of Next.js server action requirements
-const action = Next.make(AppLive)
-  .action("DoSomething")
+const action = NextAction.make("DoSomething", AppLive)
   .setInputSchema(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))
   .build(async ({ input }) => Effect.succeed({ ok: true, input }))
 
 // Server Component (with props):
-export default Next.make(AppLive)
-  .component("ServerInfo")
-  .build(({ time }: { time: { now: number } }) =>
-    Effect.succeed({
-      time
-    })
-  )
+export default NextServerComponent.make("ServerInfo", AppLive).build(({ time }: { time: { now: number } }) =>
+  Effect.succeed({
+    time
+  })
+)
 
 // Or, no props:
-export const component = Next.make(AppLive)
-  .component("ServerInfo")
-  .build(() => Effect.succeed({ ok: true }))
+export const component = NextServerComponent.make("ServerInfo", AppLive).build(() => Effect.succeed({ ok: true }))
 ```
 
 ### OpenTelemetry

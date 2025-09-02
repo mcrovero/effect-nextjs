@@ -2,12 +2,6 @@
  * @since 0.5.0
  * @category type ids
  */
-export * as Next from "./Next.js"
-
-/**
- * @since 0.5.0
- * @category type ids
- */
 export * as NextAction from "./NextAction.js"
 
 /**

@@ -3,8 +3,8 @@ import { strictEqual } from "@effect/vitest/utils"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextPage from "../src/NextPage.js"
 
 describe("Middleware catches", () => {
   it.effect("wrapped middleware catches handler failure and returns the error (page)", () =>
@@ -25,8 +25,7 @@ describe("Middleware catches", () => {
       )
 
       const combined = Layer.mergeAll(WrappedLive)
-      const page = Next.make("Base", combined)
-        .page("CatchesTestPage")
+      const page = NextPage.make("Base", combined)
         .middleware(Wrapped)
 
       const result = yield* Effect.promise(() =>

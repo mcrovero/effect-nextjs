@@ -4,8 +4,8 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextPage from "../src/NextPage.js"
 
 describe("NextPage", () => {
   class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -32,8 +32,7 @@ describe("NextPage", () => {
   it.effect("runs handler with provided services and decoded params", () =>
     Effect.gen(function*() {
       const combined = Layer.mergeAll(AuthLive, OtherLive)
-      const page = Next.make("Base", combined)
-        .page("Home")
+      const page = NextPage.make("Base", combined)
         .setParamsSchema(Schema.Struct({ id: Schema.String }))
         .setSearchParamsSchema(Schema.Struct({ q: Schema.String }))
         .middleware(AuthMiddleware)

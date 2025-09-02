@@ -1,7 +1,7 @@
 import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Next from "../src/Next.js"
+import * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 export class Theme extends Context.Tag("Theme")<Theme, { mode: "light" | "dark" }>() {}
@@ -28,8 +28,7 @@ const CatchLive = Layer.succeed(
 
 const merged = Layer.mergeAll(ThemeLive, CatchLive)
 
-const layout = Next.make("Base", merged)
-  .layout("RootLayout")
+const layout = NextLayout.make("Root", merged)
   .setParamsSchema(Schema.Struct({ locale: Schema.String }))
   .middleware(CatchMiddleware)
   .middleware(ThemeMiddleware)

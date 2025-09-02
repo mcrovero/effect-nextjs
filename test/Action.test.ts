@@ -4,7 +4,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Next from "../src/Next.js"
+import * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("NextAction", () => {
@@ -21,8 +21,7 @@ describe("NextAction", () => {
 
   it.effect("runs handler with provided services and decoded input", () =>
     Effect.gen(function*() {
-      const action = Next.make("Base", AuthLive)
-        .action("Submit")
+      const action = NextAction.make("Base", AuthLive)
         .setInputSchema(Schema.Struct({ id: Schema.Number }))
         .middleware(AuthMiddleware)
 
@@ -42,8 +41,7 @@ describe("NextAction", () => {
   it.effect("accepts input as encoded and uses it decoded", () =>
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
-        Next.make("Base", AuthLive)
-          .action("Submit")
+        NextAction.make("Submit", AuthLive)
           .setInputSchema(Schema.Struct({ id: Schema.NumberFromString }))
           .middleware(AuthMiddleware)
           .build(async ({ input }) =>

@@ -3,13 +3,14 @@ import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
-import type * as ManagedRuntime from "effect/ManagedRuntime"
+import type * as Layer from "effect/Layer"
+import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
-import { getRuntime } from "./internal/runtime-registry.js"
+import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -31,19 +32,17 @@ export type TypeId = typeof TypeId
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
-  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly inputSchema?: Schema.Schema.All
 }
 
-type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R extends
-  ManagedRuntime.ManagedRuntime<infer ROut, any> ? ROut : never
+type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
 export interface NextAction<
   in out Tag extends string,
-  out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  out L extends Layer.Layer<any, any, any>,
   out Middleware extends NextMiddleware.TagClassAny = never,
   in InputA = undefined
 > extends Pipeable {
@@ -51,25 +50,24 @@ export interface NextAction<
 
   readonly [TypeId]: TypeId
   readonly _tag: Tag
-  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly inputSchema?: Schema.Schema.All
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    middleware: Context_.Tag.Identifier<M> extends RuntimeSuccess<Runtime> ? M : never
-  ): NextAction<Tag, Runtime, Middleware | M, InputA>
+    middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
+  ): NextAction<Tag, L, Middleware | M, InputA>
 
-  setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, Runtime, Middleware, S>
+  setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextAction<Tag, Runtime, Middleware, InputA>, E>
+    H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
   >(
     handler: H
   ): (
-    input: Input<NextAction<Tag, Runtime, Middleware, InputA>>
+    input: Input<NextAction<Tag, L, Middleware, InputA>>
   ) => Promise<(ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never)>
 }
 
@@ -90,7 +88,6 @@ const Proto = {
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
-      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: [...this.middlewares, middleware],
       ...(this.inputSchema !== undefined ? { inputSchema: this.inputSchema } as const : {})
@@ -99,7 +96,6 @@ const Proto = {
   setInputSchema(this: AnyWithProps, schema: Schema.Schema.All) {
     return makeProto({
       _tag: this._tag,
-      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: this.middlewares,
       ...(schema !== undefined ? { inputSchema: schema } as const : {})
@@ -185,7 +181,7 @@ const Proto = {
        * In development we use global registry to get the runtime
        * to support hot-reloading.
        */
-      const actualRuntime = getRuntime(this._runtimeTag, runtime)
+      const actualRuntime = getRuntime(this._tag, runtime)
 
       /**
        * Workaround to handle redirect errors
@@ -216,20 +212,18 @@ const Proto = {
 
 const makeProto = <
   const Tag extends string,
-  const RuntimeTag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  const L extends Layer.Layer<any, any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly _runtimeTag: RuntimeTag
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly middlewares: ReadonlyArray<Middleware>
   readonly inputSchema?: Schema.Schema.All
-}): NextAction<Tag, Runtime, Middleware> => {
+}): NextAction<Tag, L, Middleware> => {
   function NextAction() {}
   Object.setPrototypeOf(NextAction, Proto)
   Object.assign(NextAction, options)
-  NextAction.key = `${options._runtimeTag}/${options._tag}`
+  NextAction.key = `${options._tag}`
   return NextAction as any
 }
 
@@ -239,16 +233,15 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
-  const RuntimeTag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
->(
-  tag: Tag,
-  runtimeTag: RuntimeTag,
-  runtime: Runtime
-): NextAction<Tag, Runtime> => {
+  const L extends Layer.Layer<any, any, never>
+>(tag: Tag, layer: L): NextAction<Tag, L> => {
+  const runtime = ManagedRuntime.make(layer)
+
+  // Register the runtime in the global registry for development mode (HMR support)
+  setRuntime(tag, runtime)
+
   return makeProto({
     _tag: tag,
-    _runtimeTag: runtimeTag,
     runtime,
     middlewares: [] as Array<never>
   })
@@ -260,18 +253,18 @@ export const make = <
  */
 type ExtractProvides<R extends Any> = R extends NextAction<
   infer _Tag,
-  infer _Runtime,
+  infer _Layer,
   infer _Middleware,
   infer _InputA
-> ? RuntimeSuccess<_Runtime> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
+> ? LayerSuccess<_Layer> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
-type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Runtime, infer _Middleware, infer InputA> ?
+type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
   InputA extends Schema.Schema<infer _type, infer encoded, infer _c> ? encoded : unknown
   : never
 
 type HandlerInputEffect<P extends Any> = P extends
-  NextAction<infer _Tag, infer _Runtime, infer _Middleware, infer InputA> ?
+  NextAction<infer _Tag, infer _Layer, infer _Middleware, infer InputA> ?
   (InputA extends Schema.Schema<infer type, infer _encoded, infer _c> ? Effect<type, ParseError, never> : unknown)
   : never
 
