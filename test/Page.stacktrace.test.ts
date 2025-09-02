@@ -1,41 +1,55 @@
 import { describe, it } from "@effect/vitest"
-import { assertTrue, strictEqual } from "@effect/vitest/utils"
+import { assertTrue } from "@effect/vitest/utils"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { vi } from "vitest"
 import * as NextPage from "../src/NextPage.js"
 
 describe("NextPage stacktrace", () => {
-  it.effect("logs enhanced stack including span name twice (definition and call)", () =>
+  it.effect("handles deeply nested Effect.fn calls correctly", () =>
     Effect.gen(function*() {
       class Dummy extends Context.Tag("Dummy")<Dummy, object>() {}
       const AppLive: Layer.Layer<Dummy> = Layer.succeed(Dummy, {})
 
-      const page = NextPage.make("StackTraceTest", AppLive)
+      // Create a deeper nesting
+      const level1 = Effect.fn("level1")(function*() {
+        yield* Effect.die(new Error("deep_error"))
+      })
 
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
-      try {
-        const result = yield* Effect.promise(() =>
-          page.build(() =>
-            Effect.gen(function*() {
-              yield* Effect.fail(new Error("TestBoom"))
-            }).pipe(
-              Effect.catchAllCause(Effect.logError),
-              Effect.as("ok")
-            )
-          )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
-        )
+      const level2 = Effect.fn("level2")(function*() {
+        yield* level1()
+      })
 
-        strictEqual(result, "ok")
-        const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n")
-        assertTrue(output.includes("level=ERROR"))
-        const spanName = "StackTraceTest"
-        const occurrences =
-          (output.match(new RegExp(spanName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length
-        assertTrue(occurrences >= 1)
-      } finally {
-        logSpy.mockRestore()
-      }
+      const level3 = Effect.fn("level3")(function*() {
+        yield* level2()
+      })
+
+      const level4 = Effect.fn("level4")(function*() {
+        yield* level3()
+      })
+
+      const page = NextPage.make("DeepTest", AppLive).build(() =>
+        Effect.gen(function*() {
+          yield* level4()
+        })
+      )
+
+      const either = yield* Effect.tryPromise({
+        try: () => page({ params: Promise.resolve({}), searchParams: Promise.resolve({}) }),
+        catch: (e) => e as Error
+      }).pipe(Effect.either)
+
+      assertTrue(either._tag === "Left", "Expected deeply nested page to fail")
+
+      const error = either.left
+      const stack = error.stack || ""
+
+      // Verify all levels are captured
+      assertTrue(stack.includes("level1"), "level1 should be in stacktrace")
+      assertTrue(stack.includes("level2"), "level2 should be in stacktrace")
+      assertTrue(stack.includes("level3"), "level3 should be in stacktrace")
+      assertTrue(stack.includes("level4"), "level4 should be in stacktrace")
+      assertTrue(stack.includes("DeepTest"), "DeepTest page should be in stacktrace")
+      assertTrue(stack.includes("deep_error"), "Error message should be in stacktrace")
     }))
 })

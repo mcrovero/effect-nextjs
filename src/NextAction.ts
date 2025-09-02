@@ -1,4 +1,6 @@
-import { Cause, Exit } from "effect"
+/**
+ * @since 0.5.0
+ */
 import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
@@ -9,8 +11,15 @@ import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
+import { executeWithRuntime } from "./internal/executor.js"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
 import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
+import {
+  captureCallSite,
+  captureDefinitionSite,
+  makeCaptureCallSite,
+  makeSpanAttributes
+} from "./internal/stacktrace.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -61,11 +70,30 @@ export interface NextAction<
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly inputSchema?: Schema.Schema.All
 
+  withRuntime(runtime: ManagedRuntime.ManagedRuntime<any, any>): NextAction<Tag, L, Middleware, InputA>
+
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextAction<Tag, L, Middleware | M, InputA>
 
   setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
+
+  /**
+   * Build a pure Effect program without executing it. Useful for tests where
+   * you want to provide services and run with a custom runtime.
+   */
+  buildEffect<
+    E extends CatchesFromMiddleware<Middleware>,
+    H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
+  >(
+    handler: H
+  ): (
+    input: Input<NextAction<Tag, L, Middleware, InputA>>
+  ) => Effect<
+    ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never,
+    E,
+    ExtractProvides<NextAction<Tag, L, Middleware, InputA>>
+  >
 
   build<
     E extends CatchesFromMiddleware<Middleware>,
@@ -91,6 +119,14 @@ const Proto = {
   pipe() {
     return pipeArguments(this, arguments)
   },
+  withRuntime(this: AnyWithProps, runtime: ManagedRuntime.ManagedRuntime<any, any>) {
+    return makeProto({
+      _tag: this._tag,
+      runtime,
+      middlewares: this.middlewares,
+      ...(this.inputSchema !== undefined ? { inputSchema: this.inputSchema } as const : {})
+    })
+  },
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
@@ -108,78 +144,54 @@ const Proto = {
     })
   },
 
-  build(
+  buildEffect(
     this: AnyWithProps,
     handler: (ctx: any) => Promise<Effect<any, any, any>>
   ) {
     const middlewares = this.middlewares
-    const runtime = this.runtime
     const inputSchema = this.inputSchema
-    // Capture definition stack for tracing (definition site)
-    const defLimit = (Error as any).stackTraceLimit
-    ;(Error as any).stackTraceLimit = 2
-    const errorDef = new Error()
-    ;(Error as any).stackTraceLimit = defLimit
-    const spanName = this._tag
-    const spanAttributes = {
-      attributes: {
-        library: "@mcrovero/effect-nextjs",
-        component: "NextAction",
-        tag: this._tag
-      }
-    } as const
-    return async (inputArg: unknown) => {
-      // Capture call stack for tracing (call site)
-      const callLimit = (Error as any).stackTraceLimit
-      ;(Error as any).stackTraceLimit = 2
-      const errorCall = new Error()
-      ;(Error as any).stackTraceLimit = callLimit
-      const program = Effect_.gen(function*() {
+    const spanNameLocal = this._tag
+    const spanAttributesLocal = makeSpanAttributes("NextAction", this._tag)
+    return (inputArg: unknown) => {
+      return Effect_.gen(function*() {
         const context = yield* Effect_.context<never>()
         const rawInput = inputArg !== undefined ? inputArg : undefined
         const input = inputSchema
           ? Schema.decodeUnknown(inputSchema as any)(rawInput)
           : rawInput
         const payload = { input }
-        let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
+        let handlerEffect = yield* Effect_.promise(() => handler(payload))
         if (middlewares.length > 0) {
-          const options = { callerKind: "action" as const, input: (payload as any).input }
-          const tags = middlewares as ReadonlyArray<any>
+          const options = { callerKind: "action" as const, input: payload.input }
+          const tags = middlewares
           handlerEffect = createMiddlewareChain(
             tags,
-            (tag) => Context.unsafeGet(context, tag) as any,
+            (tag) => Context.unsafeGet(context, tag),
             handlerEffect,
-            spanName,
-            spanAttributes.attributes as any,
+            spanNameLocal,
+            spanAttributesLocal,
             options
           )
         }
         return yield* handlerEffect
       })
+    }
+  },
 
-      // Create span and attach combined stacktrace (definition + call sites)
-      let cache: false | string = false
-      const captureStackTrace = () => {
-        if (cache !== false) {
-          return cache
-        }
-        if (errorCall.stack) {
-          const stackDef = errorDef.stack!.trim().split("\n")
-          const stackCall = errorCall.stack.trim().split("\n")
-          let endStackDef = stackDef.slice(2).join("\n").trim()
-          if (!endStackDef.includes(`(`)) {
-            endStackDef = endStackDef.replace(/at (.*)/, "at ($1)")
-          }
-          let endStackCall = stackCall.slice(2).join("\n").trim()
-          if (!endStackCall.includes(`(`)) {
-            endStackCall = endStackCall.replace(/at (.*)/, "at ($1)")
-          }
-          cache = `${endStackDef}\n${endStackCall}`
-          return cache
-        }
-      }
-      const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, {
-        captureStackTrace,
+  build(
+    this: AnyWithProps,
+    handler: (ctx: any) => Promise<Effect<any, any, any>>
+  ) {
+    const runtime = this.runtime
+    const spanName = this._tag
+    const spanAttributes = makeSpanAttributes("NextAction", this._tag)
+    const errorDef = captureDefinitionSite()
+    return async (inputArg: unknown) => {
+      const errorCall = captureCallSite()
+      const program = Proto.buildEffect.call(this, handler)(inputArg)
+
+      const effectWithSpan = Effect_.withSpan(program, spanName, {
+        captureStackTrace: makeCaptureCallSite(errorDef, errorCall),
         attributes: spanAttributes
       })
 
@@ -189,29 +201,7 @@ const Proto = {
        */
       const actualRuntime = getRuntime(`${NextActionSymbolKey}/${this._tag}`, runtime)
 
-      /**
-       * Workaround to handle redirect errors
-       */
-      return actualRuntime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
-        if (Exit.isFailure(result)) {
-          const mappedError = Cause.match<any, any>(result.cause, {
-            onEmpty: () => new Error("empty"),
-            onFail: (error) => error,
-            onDie: (defect) => defect,
-            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
-            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
-            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
-          })
-
-          // Replace the stack with the effect stacktrace
-          const effectPretty = Cause.pretty(result.cause as any)
-          if (effectPretty && typeof effectPretty === "string") {
-            mappedError.stack = effectPretty
-          }
-          throw mappedError
-        }
-        return result.value
-      })
+      return executeWithRuntime(actualRuntime, effectWithSpan as Effect<any, any, never>)
     }
   }
 }
