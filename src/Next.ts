@@ -2,6 +2,7 @@ import type { Layer } from "effect"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
+import { setRuntime } from "./internal/runtime-registry.js"
 import * as NextAction from "./NextAction.js"
 import * as NextLayout from "./NextLayout.js"
 import * as NextPage from "./NextPage.js"
@@ -69,38 +70,33 @@ const Proto = {
     return pipeArguments(this, arguments)
   },
   page(this: Any, key: string) {
-    return NextPage.make(key, this.runtime)
+    return NextPage.make(key, this._tag, this.runtime)
   },
   layout(this: Any, key: string) {
-    return NextLayout.make(key, this.runtime)
+    return NextLayout.make(key, this._tag, this.runtime)
   },
   action(this: Any, key: string) {
-    return NextAction.make(key, this.runtime)
+    return NextAction.make(key, this._tag, this.runtime)
   },
   component(this: Any, key: string) {
-    return NextServerComponent.make(key, this.runtime)
+    return NextServerComponent.make(key, this._tag, this.runtime)
   }
 }
 
 const makeProto = <
+  const Tag extends string,
   const Layer extends Layer.Layer<any, any, any>,
   const Runtime extends RuntimeFromLayer<Layer>
 >(options: {
+  readonly _tag: Tag
   readonly layer: Layer
   readonly runtime: Runtime
-  readonly key: string
 }): Next<Layer> => {
   function Next() {}
   Object.setPrototypeOf(Next, Proto)
   Object.assign(Next, options)
-  Next.key = options.key
+  Next.key = `@mcrovero/effect-nextjs/Next/${options._tag}`
   return Next as any
-}
-
-declare global {
-  var __effect_nextjs_runtime_registry__:
-    | Record<string, { dispose: () => Promise<void> } | undefined>
-    | undefined
 }
 
 /**
@@ -108,33 +104,22 @@ declare global {
  * @category constructors
  */
 export const make = <
+  const Tag extends string,
   const Layer extends Layer.Layer<any, any, never>
 >(
-  key: string,
+  tag: Tag,
   layer: Layer
 ): Next<Layer> => {
-  const isDev = process.env.NODE_ENV !== "production"
-
-  if (isDev && key) {
-    const registry =
-      (globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {})
-    const previous = registry[key]
-    if (previous) {
-      // fire-and-forget: ensure previous scoped resources/fibers are finalized
-      void previous.dispose()
-    }
-  }
-
   const runtime = ManagedRuntime.make(layer) as RuntimeFromLayer<Layer>
+
+  // Register the runtime in the global registry for development mode
+  setRuntime(tag, runtime)
+
   const next = makeProto({
+    _tag: tag,
     layer,
-    runtime,
-    key
-  }) as any
-  if (isDev && key) {
-    const registry =
-      (globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {})
-    registry[key] = (next as any).runtime
-  }
+    runtime
+  })
+
   return next
 }

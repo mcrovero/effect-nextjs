@@ -10,13 +10,14 @@ import { pipeArguments } from "effect/Pipeable"
 import * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
+import { getRuntime } from "./internal/runtime-registry.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
  * @since 0.5.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Layout")
+export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/NextLayout")
 
 /**
  * @since 0.5.0
@@ -41,9 +42,16 @@ export interface AnySchema extends Pipeable {
  * @since 0.5.0
  * @category models
  */
+export interface Any extends Pipeable {
+  readonly [TypeId]: TypeId
+  readonly _tag: string
+  readonly key: string
+}
+
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
+  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
@@ -55,7 +63,7 @@ type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R exten
 
 export interface NextLayout<
   in out Tag extends string,
-  in out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
   out Middleware extends NextMiddleware.TagClassAny = never,
   out ParamsA = undefined
 > extends Pipeable {
@@ -63,6 +71,7 @@ export interface NextLayout<
 
   readonly [TypeId]: TypeId
   readonly _tag: Tag
+  readonly _runtimeTag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
   readonly runtime: Runtime
@@ -87,15 +96,6 @@ export interface NextLayout<
   ) => Promise<ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never>
 }
 
-export interface Any extends Pipeable {
-  readonly [TypeId]: TypeId
-  readonly _tag: string
-  readonly key: string
-  readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAny>
-  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
-  readonly paramsSchema?: AnySchema
-}
-
 const Proto = {
   [TypeId]: TypeId,
   pipe() {
@@ -104,18 +104,19 @@ const Proto = {
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
       _tag: this._tag,
+      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: [...this.middlewares, middleware]
     })
   },
   setParamsSchema(this: AnyWithProps, schema: AnySchema) {
-    const options = {
+    return makeProto({
       _tag: this._tag,
+      _runtimeTag: this._runtimeTag,
       runtime: this.runtime,
       middlewares: this.middlewares,
       ...(schema !== undefined ? { paramsSchema: schema } as const : {})
-    }
-    return makeProto(options)
+    })
   },
 
   build(
@@ -198,9 +199,15 @@ const Proto = {
       })
 
       /**
+       * In development we use global registry to get the runtime
+       * to support hot-reloading.
+       */
+      const actualRuntime = getRuntime(this._runtimeTag, runtime)
+
+      /**
        * Workaround to handle redirect errors
        */
-      return runtime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
+      return actualRuntime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
         if (Exit.isFailure(result)) {
           const mappedError = Cause.match<any, any>(result.cause, {
             onEmpty: () => new Error("empty"),
@@ -226,10 +233,12 @@ const Proto = {
 
 const makeProto = <
   const Tag extends string,
+  const RuntimeTag extends string,
   const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
+  readonly _runtimeTag: RuntimeTag
   readonly runtime: Runtime
   readonly middlewares: ReadonlyArray<Middleware>
   readonly paramsSchema?: AnySchema
@@ -237,7 +246,7 @@ const makeProto = <
   function NextLayout() {}
   Object.setPrototypeOf(NextLayout, Proto)
   Object.assign(NextLayout, options)
-  NextLayout.key = `@mcrovero/effect-nextjs/NextLayout/${options._tag}`
+  NextLayout.key = `${options._runtimeTag}/${options._tag}`
   return NextLayout as any
 }
 
@@ -247,16 +256,19 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
+  const RuntimeTag extends string,
   const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
 >(
   tag: Tag,
+  runtimeTag: RuntimeTag,
   runtime: Runtime
 ): NextLayout<Tag, Runtime> => {
   return makeProto({
     _tag: tag,
+    _runtimeTag: runtimeTag,
     runtime,
     middlewares: [] as Array<never>
-  }) as any
+  })
 }
 
 /**

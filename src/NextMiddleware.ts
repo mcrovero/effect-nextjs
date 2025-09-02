@@ -188,7 +188,9 @@ export interface TagClassAny extends Context.Tag<any, any> {
  * @since 0.5.0
  * @category models
  */
-export interface TagClassAnyWithProps extends Context.Tag<any, any> {
+export interface TagClassAnyWithProps
+  extends Context.Tag<any, NextMiddleware<any, any, any> | NextMiddlewareWrap<any, any, any>>
+{
   readonly [TypeId]: TypeId
   readonly provides?: Context.Tag<any, any> | undefined
   readonly failure: Schema.Schema.All
@@ -263,7 +265,7 @@ type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer 
 type FailureFromTag<M> = M extends { readonly failure: Schema.Schema<infer A, any, any> } ? A : never
 
 export function layer<
-  M extends TagClassAnyWithProps,
+  M extends TagClassAny,
   Impl extends (
     options:
       & MiddlewareOptions
