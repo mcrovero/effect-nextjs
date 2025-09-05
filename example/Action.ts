@@ -23,18 +23,12 @@ const AuthLive = Layer.succeed(
 )
 
 const action = NextAction.make("Base", AuthLive)
-  .setInputSchema(
-    Schema.Struct({
-      id: Schema.Number
+  .middleware(AuthMiddleware)
+  .build(
+    Effect.fn("Action")(function*({ test }: { test: string }) {
+      const user = yield* CurrentUser
+      return { user, parsed: test }
     })
   )
-  .middleware(AuthMiddleware)
-  .build(async ({ input }) =>
-    Effect.gen(function*() {
-      const user = yield* CurrentUser
-      const parsed = yield* input
-      return { user, parsed }
-    }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
-  )
 
-console.log(await action({ id: 123 }))
+console.log(await action({ test: "123" }))

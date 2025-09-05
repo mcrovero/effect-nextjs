@@ -1,6 +1,7 @@
 import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import { ParseError } from "effect/ParseResult"
 import * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
@@ -16,30 +17,35 @@ const ThemeLive = Layer.succeed(
   ThemeMiddleware.of(() => Effect.succeed({ mode: "dark" }))
 )
 
-export class CatchMiddleware extends NextMiddleware.Tag<CatchMiddleware>()(
-  "CatchMiddleware",
-  { wrap: true, catches: Schema.String }
+export class CatchAll extends NextMiddleware.Tag<CatchAll>()(
+  "CatchAll",
+  {
+    catches: Schema.Union(Schema.String, Schema.instanceOf(ParseError)),
+    wrap: true,
+    returns: Schema.Struct({ success: Schema.Literal(false), error: Schema.String })
+  }
 ) {}
 
-const CatchLive = Layer.succeed(
-  CatchMiddleware,
-  CatchMiddleware.of(() => Effect.succeed({ error: "boom" }))
+const CatchAllLive = NextMiddleware.layer(
+  CatchAll,
+  ({ next }) =>
+    Effect.gen(function*() {
+      return yield* next.pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
+    })
 )
 
-const merged = Layer.mergeAll(ThemeLive, CatchLive)
+const app = Layer.mergeAll(CatchAllLive, ThemeLive)
 
-const layout = NextLayout.make("Root", merged)
-  .setParamsSchema(Schema.Struct({ locale: Schema.String }))
-  .middleware(CatchMiddleware)
+const BaseLayout = NextLayout.make("Root", app)
+
+const layout = BaseLayout
   .middleware(ThemeMiddleware)
-  .build(({ children, params }) =>
-    Effect.gen(function*() {
+  .middleware(CatchAll)
+  .build(
+    Effect.fn("RootLayout")(function*({ children, params }) {
       const theme = yield* Theme
-      const resolvedParams = yield* params
-      yield* Effect.fail("boom")
-
-      return { theme, params: resolvedParams, children }
-    }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
+      return { theme, params, children }
+    })
   )
 
 console.log(await layout({ children: "<div>Child</div>", params: Promise.resolve({ locale: "en" }) }))

@@ -38,17 +38,34 @@ const app = Layer.mergeAll(CatchAllLive, ProvideUserLive)
 
 const BasePage = NextPage.make("Home", app)
 
+export const decodeParams = <T>(schema: Schema.Schema<T, any, any>) => {
+  return (props: { params: Promise<Record<string, string | Array<string> | undefined>> }) => {
+    return Effect.gen(function*() {
+      const params = yield* Effect.promise(() => props.params)
+      return yield* Schema.decodeUnknown(schema)(params)
+    })
+  }
+}
+
 const page = BasePage
-  .setParamsSchema(Schema.Struct({ id: Schema.String }))
   .middleware(ProvideUser)
   .middleware(CatchAll)
-  .build(({ params }) =>
-    Effect.gen(function*() {
-      const user = yield* CurrentUser
-      const resolvedParams = yield* params
-      return { user, params: resolvedParams }
+  .build(
+    Effect.fn("HomePage")(function*(props: { params: Promise<{ id: string }> }) {
+      const params = yield* decodeParams(Schema.Struct({ id: Schema.String }))(props)
+      return `Hello ${params.id}!`
     })
   )
 
-const result = await page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) })
+const result = await page({ params: Promise.resolve({ id: "abc" }) })
 console.log(result)
+
+// const page2 = BasePage
+//   .middleware(ProvideUser)
+//   .middleware(CatchAll)
+//   .build(({ params }: { params: Promise<{ id: string }> }) =>
+//     Effect.gen(function*() {
+//       yield* Effect.promise(() => params)
+//       return "test"
+//     })
+//   )

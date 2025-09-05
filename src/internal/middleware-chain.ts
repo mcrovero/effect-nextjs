@@ -33,8 +33,6 @@ export const createMiddlewareChain = (
   tags: ReadonlyArray<NextMiddleware.TagClassAny>,
   resolve: (tag: NextMiddleware.TagClassAny) => any,
   base: Effect<any, any, any>,
-  spanName: string,
-  spanAttributes: Record<string, unknown>,
   options: MiddlewareChainOptionsBase
 ): Effect<any, any, any> => {
   const buildChain = (index: number): Effect<any, any, any> => {
@@ -44,36 +42,17 @@ export const createMiddlewareChain = (
     const tag = tags[index]
     const middleware = resolve(tag)
     const tail = buildChain(index + 1)
-    const middlewareSpanName = `${spanName}/middleware/${tag.key ?? "unknown"}`
-    const middlewareSpanOptions = {
-      attributes: {
-        ...spanAttributes,
-        middleware: tag.key ?? "unknown"
-      }
-    } as const
     if (tag.wrap) {
-      return Effect_.withSpan(
-        middleware({ ...options, next: tail }) as any,
-        middlewareSpanName,
-        middlewareSpanOptions
-      ) as any
+      return middleware({ ...options, next: tail })
     }
     return tag.provides !== undefined
       ? Effect_.provideServiceEffect(
         tail,
         tag.provides as any,
-        Effect_.withSpan(
-          middleware(options) as any,
-          middlewareSpanName,
-          middlewareSpanOptions
-        ) as any
+        middleware(options) as any
       )
       : Effect_.zipRight(
-        Effect_.withSpan(
-          middleware(options) as any,
-          middlewareSpanName,
-          middlewareSpanOptions
-        ),
+        middleware(options) as any,
         tail
       )
   }

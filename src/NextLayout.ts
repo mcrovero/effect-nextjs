@@ -1,25 +1,17 @@
 /**
  * @since 0.5.0
  */
-import type * as Context_ from "effect/Context"
+import * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
 import type * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
-import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
-import type * as Schema from "effect/Schema"
-import type * as AST from "effect/SchemaAST"
 import { executeWithRuntime } from "./internal/executor.js"
-import { buildLayoutEffect } from "./internal/next-layout.js"
+import { createMiddlewareChain } from "./internal/middleware-chain.js"
 import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
-import {
-  captureCallSite,
-  captureDefinitionSite,
-  makeCaptureCallSite,
-  makeSpanAttributes
-} from "./internal/stacktrace.js"
+import type { AnySchema, CatchesFromMiddleware, WrappedReturns } from "./internal/shared.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -32,7 +24,7 @@ const NextLayoutSymbolKey = "@mcrovero/effect-nextjs/NextLayout"
  * @since 0.5.0
  * @category models
  */
-export interface NextLayoutBaseProps {
+export interface NextBaseProps {
   readonly params: Promise<Record<string, string | Array<string> | undefined>>
   readonly children?: any
 }
@@ -51,19 +43,6 @@ export type TypeId = typeof TypeId
 
 /**
  * @since 0.5.0
- * @category constructors
- */
-export interface AnySchema extends Pipeable {
-  readonly [Schema.TypeId]: any
-  readonly Type: any
-  readonly Encoded: any
-  readonly Context: any
-  readonly make?: (params: any, ...rest: ReadonlyArray<any>) => any
-  readonly ast: AST.AST
-}
-
-/**
- * @since 0.5.0
  * @category models
  */
 export interface Any extends Pipeable {
@@ -72,22 +51,28 @@ export interface Any extends Pipeable {
   readonly key: string
 }
 
+/**
+ * @since 0.5.0
+ * @category models
+ */
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
-  readonly paramsSchema?: AnySchema
 }
 
 type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
+/**
+ * @since 0.5.0
+ * @category models
+ */
 export interface NextLayout<
   in out Tag extends string,
   out L extends Layer.Layer<any, any, any>,
-  out Middleware extends NextMiddleware.TagClassAny = never,
-  out ParamsA = undefined
+  out Middleware extends NextMiddleware.TagClassAny = never
 > extends Pipeable {
   new(_: never): object
 
@@ -98,27 +83,30 @@ export interface NextLayout<
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly paramsSchema?: AnySchema
 
-  withRuntime(runtime: ManagedRuntime.ManagedRuntime<any, any>): NextLayout<Tag, L, Middleware, ParamsA>
+  withRuntime(runtime: ManagedRuntime.ManagedRuntime<any, any>): NextLayout<Tag, L, Middleware>
 
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
-  ): NextLayout<Tag, L, Middleware | M, ParamsA>
-
-  setParamsSchema<S extends AnySchema>(schema: S): NextLayout<Tag, L, Middleware, S["Type"]>
+  ): NextLayout<Tag, L, Middleware | M>
 
   build<
-    P extends NextLayoutBaseProps = NextLayoutBaseProps,
-    E extends CatchesFromMiddleware<Middleware> = CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextLayout<Tag, L, Middleware, ParamsA>, E, P> = BuildHandlerWithError<
-      NextLayout<Tag, L, Middleware, ParamsA>,
-      E,
-      P
-    >
+    I,
+    O
   >(
-    handler: H
-  ): (props: P) => Promise<ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never>
+    handler: BuildHandler<NextLayout<Tag, L, Middleware>, I, O>
+  ): (
+    args: I
+  ) => Promise<
+    ReturnType<BuildHandler<NextLayout<Tag, L, Middleware>, I, O>> extends Effect<infer _A, any, any> ?
+      _A | WrappedReturns<Middleware> :
+      never
+  >
 }
 
+/**
+ * @since 0.5.0
+ * @category models
+ */
 const Proto = {
   [TypeId]: TypeId,
   pipe() {
@@ -128,8 +116,7 @@ const Proto = {
     return makeProto({
       _tag: this._tag,
       runtime,
-      middlewares: this.middlewares,
-      ...(this.paramsSchema !== undefined ? { paramsSchema: this.paramsSchema } as const : {})
+      middlewares: this.middlewares
     })
   },
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
@@ -139,50 +126,49 @@ const Proto = {
       middlewares: [...this.middlewares, middleware]
     })
   },
-  setParamsSchema(this: AnyWithProps, schema: AnySchema) {
-    return makeProto({
-      _tag: this._tag,
-      runtime: this.runtime,
-      middlewares: this.middlewares,
-      ...(schema !== undefined ? { paramsSchema: schema } as const : {})
-    })
-  },
+
   build<
-    P extends NextLayoutBaseProps = NextLayoutBaseProps,
-    E extends CatchesFromMiddleware<any> = CatchesFromMiddleware<any>,
-    H extends BuildHandlerWithError<any, E, P> = BuildHandlerWithError<any, E, P>
+    I extends NextBaseProps,
+    O
   >(
     this: AnyWithProps,
-    handler: H
+    handler: (
+      payload: I
+    ) => Effect<O, any, any>
   ) {
     const runtime = this.runtime
-    const spanName = this._tag
-    const spanAttributes = makeSpanAttributes("NextLayout", this._tag)
-    const errorDef = captureDefinitionSite()
-    return async (props: P) => {
-      const errorCall = captureCallSite()
-      const program = buildLayoutEffect<P, E, H>(
-        {
-          middlewares: this.middlewares as ReadonlyArray<any>,
-          paramsSchema: this.paramsSchema as any,
-          spanName,
-          spanAttributes
-        },
-        handler as any
-      )(props)
+    return async (props: I) => {
+      const middlewares = this.middlewares
 
-      const effectWithSpan = Effect_.withSpan(program, spanName, {
-        captureStackTrace: makeCaptureCallSite(errorDef, errorCall),
-        attributes: spanAttributes
+      const program = Effect_.gen(function*() {
+        const context = yield* Effect_.context<never>()
+
+        let handlerEffect = handler(props)
+
+        if (middlewares.length > 0) {
+          const options = {
+            callerKind: "layout" as const,
+            params: props.params,
+            children: props.children
+          }
+          const tags = middlewares
+          handlerEffect = createMiddlewareChain(
+            tags,
+            (tag) => Context_.unsafeGet(context, tag),
+            handlerEffect,
+            options
+          )
+        }
+        return yield* handlerEffect
       })
-
       /**
        * In development we use global registry to get the runtime
        * to support hot-reloading.
        */
       const actualRuntime = getRuntime(`${NextLayoutSymbolKey}/${this._tag}`, runtime)
 
-      return executeWithRuntime(actualRuntime, effectWithSpan as Effect<any, any, never>)
+      // Workaround to handle redirect errors
+      return executeWithRuntime(actualRuntime, program as Effect<any, any, never>)
     }
   }
 }
@@ -224,44 +210,16 @@ export const make = <
   })
 }
 
-/**
- * @since 0.5.0
- * @category models
- */
 type ExtractProvides<R extends Any> = R extends NextLayout<
   infer _Tag,
   infer _Layer,
-  infer _Middleware,
-  infer _ParamsA
+  infer _Middleware
 > ?
     | LayerSuccess<_Layer>
     | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
-export type Params<P extends Any> = P extends NextLayout<
-  infer _Tag,
-  infer _Layer,
-  infer _Middleware,
-  infer _ParamsA
-> ?
-  _ParamsA extends undefined ?
-    Effect_.Effect<Readonly<Record<string, string | Array<string> | undefined>>, never, never>
-  : Effect_.Effect<_ParamsA, ParseError, never>
-  : never
-
-// Allowed errors are from wrapped middlewares' catches schema (otherwise never)
-type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
-  : never
-
-// Helper to constrain a layout handler's error to an allowed schema-derived type
-type BuildHandlerWithError<P extends Any, E, Props = NextLayoutBaseProps> = (
-  request: Omit<Props, "params"> & {
-    readonly params: Params<P>
-  }
-) => Effect<any, E, ExtractProvides<P>>
-
-// Collect the union of "returns" value types from wrapped middlewares' Schema
-type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
-type WrappedReturns<M> = M extends { readonly wrap: true }
-  ? InferSchemaOutput<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
-  : never
+type BuildHandler<P extends Any, I, O> = P extends NextLayout<infer _Tag, infer _Layer, infer _Middleware> ? (
+    args: I
+  ) => Effect<O, CatchesFromMiddleware<_Middleware>, ExtractProvides<P>> :
+  never
