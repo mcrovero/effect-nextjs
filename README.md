@@ -1,5 +1,7 @@
 # @mcrovero/effect-nextjs
 
+Thin wrapper around Next.js App Router to build pages, layouts, server components, and server actions in the Effect world. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
+
 [![npm version](https://img.shields.io/npm/v/%40mcrovero%2Feffect-nextjs.svg?logo=npm&label=npm)](https://www.npmjs.com/package/@mcrovero/effect-nextjs)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
@@ -8,14 +10,13 @@
 >
 > ### Breaking changes (v0.10.0)
 >
-> This version changes the API to use the library, there is no more a global Next.make(Layer) that exposes .page()/.layout()/.action()/.component() methods. You now need to use: NextPage.make("page_key", Layer), NextLayout.make("layout_key", Layer), etc..
-> The keys must be unique across the same type components.
+> This version changes the API to use the library, there is no longer a global Next.make(Layer) that exposes .page()/.layout()/.action()/.component() methods. You now need to use: NextPage.make("page_key", Layer), NextLayout.make("layout_key", Layer), etc.
+> The keys must be unique across the same type of components.
 > There are no more `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`.
 > You can now use the new helpers inside your handler:
 >
 > - `yield* Next.decodeParams(schema)(props)`
 > - `yield* Next.decodeSearchParams(schema)(props)`
-> - `yield* Next.decodeInput(schema)(input)`
 >   Read at the bottom of the README for more details for the decisions behind the new API.
 
 ### Why this library
@@ -100,7 +101,7 @@ export default async function Page(props: {
 Notes
 
 - Use `NextLayout.make(tag, layer)`, `NextServerComponent.make(tag, layer)`, and `NextAction.make(tag, layer)` for layouts, server components, and server actions.
-- Parse/validate values inside your handler using helpers: `Next.decodeParams(...)`, `Next.decodeSearchParams(...)`, and `Next.decodeInput(...)`.
+- Parse/validate values inside your handler using helpers: `Next.decodeParams(...)` and `Next.decodeSearchParams(...)`
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
@@ -180,7 +181,7 @@ const page = NextPage.make("Home", AppLive)
   .build(() => Effect.succeed("ok"))
 ```
 
-### Parsing params, searchParams and input
+### Parsing params, searchParams
 
 Use `Schema` to validate/transform values explicitly inside your handler.
 
@@ -199,33 +200,11 @@ const page = NextPage.make("Home", AppLive).build(
     return { params, searchParams }
   })
 )
-
-// Input (Action)
-const action = NextAction.make("DoSomething", AppLive).build(({ input }: { input: unknown }) =>
-  Effect.gen(function* () {
-    const parsed = yield* Next.decodeInput(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))(
-      input
-    )
-    return { ok: true, input: parsed }
-  })
-)
-
-// Server Component (with props):
-export default NextServerComponent.make("ServerInfo", AppLive).build(({ time }: { time: { now: number } }) =>
-  Effect.succeed({
-    time
-  })
-)
-
-// Or, no props:
-export const component = NextServerComponent.make("ServerInfo", AppLive).build(() => Effect.succeed({ ok: true }))
 ```
 
-> ### Why the new syntax
->
-> - **Next.js Route Props Helpers**: Next.js now exposes globally available route props helpers (e.g. `PageProps`, `LayoutProps`) for fully typed route params and context. The new API keeps your handlers close to Next.js’ default patterns and plays nicely with these helpers. See the official announcement: [Next.js 15.5 – Route Props Helpers](https://nextjs.org/blog/next-15-5#route-props-helpers).
-> - **Use `Effect.fn` directly**: The previous version was too opinionated and made it awkward to use `Effect.fn`. The new architecture embraces `Effect.fn` in handlers while preserving the library’s conveniences.
-> - **Spans and tracing**: You still get automatic spans around pages, layouts, actions, and server components, leveraging Effect’s default tracing mechanism.
-> - **Flexible parsing**: Instead of embedding parsing, the library now provides lightweight helpers like `Next.decodeParams` and `Next.decodeSearchParams`. You can use them, or build your own.
+### Why the new syntax
 
-Thin wrapper around Next.js App Router to build pages, layouts, server components, and server actions in the Effect world. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
+- **Next.js Route Props Helpers**: Next.js now exposes globally available route props helpers (e.g. `PageProps`, `LayoutProps`) for fully typed route params and context. The new API keeps your handlers close to Next.js’ default patterns and plays nicely with these helpers. See the official announcement: [Next.js 15.5 – Route Props Helpers](https://nextjs.org/blog/next-15-5#route-props-helpers).
+- **Use `Effect.fn` directly**: The previous version was too opinionated and made it awkward to use `Effect.fn`. The new architecture embraces `Effect.fn` in handlers while preserving the library’s conveniences.
+- **Spans and tracing**: You can now get automatic spans around pages, layouts, actions, and server components using Effect official tracing mechanism.
+- **Flexible parsing**: Instead of embedding parsing, the library now provides lightweight helpers like `Next.decodeParams` and `Next.decodeSearchParams`. You can use them, or build your own.

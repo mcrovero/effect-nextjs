@@ -27,12 +27,3 @@ export const decodeSearchParams =
       const searchParams = yield* Effect.promise(() => props.searchParams)
       return yield* Schema.decodeUnknown(schema)(searchParams)
     })
-
-/**
- * @since 0.5.0
- * @category decode
- */
-export const decodeInput = <T, I>(schema: Schema.Schema<T, any, any>) => (input: I) =>
-  Effect.gen(function*() {
-    return yield* Schema.decodeUnknown(schema)(input)
-  })
