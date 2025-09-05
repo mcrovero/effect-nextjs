@@ -26,8 +26,9 @@ describe("NextLayout", () => {
         .middleware(ThemeMiddleware)
 
       const result = yield* Effect.promise(() =>
-        layout.build(({ children, params }) =>
+        layout.build((props: { params: Promise<Record<string, string | Array<string> | undefined>>; children?: any }) =>
           Effect.gen(function*() {
+            const { children, params } = props
             const theme = yield* Theme
             const decodedParams = yield* decodeParams(Schema.Struct({ locale: Schema.String }))({ params })
             return { theme, params: decodedParams, children }

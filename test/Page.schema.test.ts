@@ -15,9 +15,15 @@ describe("NextPage schema failures", () => {
     Effect.gen(function*() {
       const either = yield* Effect.tryPromise({
         try: () =>
-          app.build(({ params }) =>
+          app.build((
+            props: {
+              params: Promise<Record<string, string | Array<string> | undefined>>
+              searchParams: Promise<Record<string, string | Array<string> | undefined>>
+            }
+          ) =>
             Effect.gen(function*() {
-              const _decoded = yield* decodeParams(Schema.Struct({ id: Schema.Number }))({ params })
+              const { params } = props
+              yield* decodeParams(Schema.Struct({ id: Schema.Number }))({ params }).pipe(Effect.orDie)
               return "ok" as const
             })
           )({
@@ -33,9 +39,15 @@ describe("NextPage schema failures", () => {
     Effect.gen(function*() {
       const either = yield* Effect.tryPromise({
         try: () =>
-          app.build(({ searchParams }) =>
+          app.build((
+            props: {
+              params: Promise<Record<string, string | Array<string> | undefined>>
+              searchParams: Promise<Record<string, string | Array<string> | undefined>>
+            }
+          ) =>
             Effect.gen(function*() {
-              const _decoded = yield* decodeSearchParams(Schema.Struct({ q: Schema.Number }))({ searchParams })
+              const { searchParams } = props
+              yield* decodeSearchParams(Schema.Struct({ q: Schema.Number }))({ searchParams }).pipe(Effect.orDie)
               return "ok" as const
             })
           )({
