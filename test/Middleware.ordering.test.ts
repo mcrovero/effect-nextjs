@@ -195,7 +195,7 @@ describe("Middleware ordering", () => {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"
           })
-        )()
+        )({})
       )
 
       strictEqual(result, "ok")

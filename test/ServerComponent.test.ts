@@ -29,7 +29,7 @@ describe("NextServerComponent", () => {
             const time = yield* ServerTime
             return { time }
           })
-        )()
+        )({})
       )
 
       assertTrue(typeof result.time.now === "number")

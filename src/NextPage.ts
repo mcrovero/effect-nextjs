@@ -2,7 +2,6 @@
  * @since 0.5.0
  */
 import type * as Context_ from "effect/Context"
-import * as Context from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
 import type * as Layer from "effect/Layer"
@@ -10,10 +9,10 @@ import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
-import * as Schema from "effect/Schema"
+import type * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 import { executeWithRuntime } from "./internal/executor.js"
-import { createMiddlewareChain } from "./internal/middleware-chain.js"
+import { buildPageEffect } from "./internal/next-page.js"
 import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import {
   captureCallSite,
@@ -28,6 +27,15 @@ import type * as NextMiddleware from "./NextMiddleware.js"
  * @category constants
  */
 const NextPageSymbolKey = "@mcrovero/effect-nextjs/NextPage"
+
+/**
+ * @since 0.5.0
+ * @category models
+ */
+export interface NextBaseProps {
+  readonly params: Promise<Record<string, string | Array<string> | undefined>>
+  readonly searchParams: Promise<Record<string, string | Array<string> | undefined>>
+}
 
 /**
  * @since 0.5.0
@@ -110,37 +118,16 @@ export interface NextPage<
   setParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, S["Type"], SearchParamsA>
   setSearchParamsSchema<S extends AnySchema>(schema: S): NextPage<Tag, L, Middleware, ParamsA, S["Type"]>
 
-  /**
-   * Build a pure Effect program without executing it. Useful for tests where
-   * you want to provide services and run with a custom runtime.
-   */
-  buildEffect<
-    E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
-  >(
-    handler: H
-  ): (
-    props: {
-      readonly params: Promise<Record<string, string | undefined>>
-      readonly searchParams: Promise<Record<string, string | undefined>>
-    }
-  ) => Effect<
-    ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never,
-    E,
-    ExtractProvides<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>>
-  >
-
   build<
-    E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E>
+    P = NextBaseProps,
+    E extends CatchesFromMiddleware<Middleware> = CatchesFromMiddleware<Middleware>,
+    H extends BuildHandlerWithError<NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>, E> = BuildHandlerWithError<
+      NextPage<Tag, L, Middleware, ParamsA, SearchParamsA>,
+      E
+    >
   >(
     handler: H
-  ): (
-    props: {
-      readonly params: Promise<Record<string, string | undefined>>
-      readonly searchParams: Promise<Record<string, string | undefined>>
-    }
-  ) => Promise<ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never>
+  ): (props: P) => Promise<ReturnType<H> extends Effect<infer _A, any, any> ? _A | WrappedReturns<Middleware> : never>
 }
 
 /**
@@ -191,75 +178,30 @@ const Proto = {
     })
   },
 
-  buildEffect(
+  build<
+    P extends NextBaseProps = NextBaseProps,
+    E extends CatchesFromMiddleware<any> = CatchesFromMiddleware<any>,
+    H extends BuildHandlerWithError<any, E> = BuildHandlerWithError<any, E>
+  >(
     this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>
-  ) {
-    const middlewares = this.middlewares
-    const paramsSchema = this.paramsSchema
-    const searchParamsSchema = this.searchParamsSchema
-    const spanNameLocal = this._tag
-    const spanAttributesLocal = makeSpanAttributes("NextPage", this._tag)
-    return (props: {
-      readonly params: Promise<Record<string, string | undefined>>
-      readonly searchParams: Promise<Record<string, string | undefined>>
-    }) => {
-      const rawParams = props?.params ?? Promise.resolve({})
-      const rawSearchParams = props?.searchParams ?? Promise.resolve({})
-      return Effect_.gen(function*() {
-        const context = yield* Effect_.context<never>()
-        const paramsEffect = paramsSchema
-          ? Effect_.promise(() => rawParams).pipe(
-            Effect_.flatMap((value) => Schema.decodeUnknown(paramsSchema as any)(value))
-          )
-          : Effect_.promise(() => rawParams)
-        const searchParamsEffect = searchParamsSchema
-          ? Effect_.promise(() => rawSearchParams).pipe(
-            Effect_.flatMap((value) => Schema.decodeUnknown(searchParamsSchema as any)(value))
-          )
-          : Effect_.promise(() => rawSearchParams)
-
-        const payload = {
-          params: paramsEffect,
-          searchParams: searchParamsEffect
-        } as any
-
-        let handlerEffect = handler(payload as any) as Effect<any, any, any>
-        if (middlewares.length > 0) {
-          const options = {
-            callerKind: "page" as const,
-            params: rawParams,
-            searchParams: rawSearchParams
-          }
-          const tags = middlewares as ReadonlyArray<any>
-          handlerEffect = createMiddlewareChain(
-            tags,
-            (tag) => Context.unsafeGet(context, tag) as any,
-            handlerEffect,
-            spanNameLocal,
-            spanAttributesLocal,
-            options
-          )
-        }
-        return yield* handlerEffect
-      }) as any
-    }
-  },
-
-  build(
-    this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>
+    handler: H
   ) {
     const runtime = this.runtime
     const spanName = this._tag
     const spanAttributes = makeSpanAttributes("NextPage", this._tag)
     const errorDef = captureDefinitionSite()
-    return async (props: {
-      readonly params: Promise<Record<string, string | undefined>>
-      readonly searchParams: Promise<Record<string, string | undefined>>
-    }) => {
+    return async (props: P) => {
       const errorCall = captureCallSite()
-      const program = Proto.buildEffect.call(this, handler)(props)
+      const program = buildPageEffect<P, E, H>(
+        {
+          middlewares: this.middlewares as ReadonlyArray<any>,
+          paramsSchema: this.paramsSchema as any,
+          searchParamsSchema: this.searchParamsSchema as any,
+          spanName,
+          spanAttributes
+        },
+        handler as any
+      )(props)
 
       const effectWithSpan = Effect_.withSpan(program as Effect<any, any, any>, spanName, {
         captureStackTrace: makeCaptureCallSite(errorDef, errorCall),

@@ -1,7 +1,6 @@
 /**
  * @since 0.5.0
  */
-import * as Context from "effect/Context"
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
@@ -10,9 +9,9 @@ import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { ParseError } from "effect/ParseResult"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
-import * as Schema from "effect/Schema"
+import type * as Schema from "effect/Schema"
 import { executeWithRuntime } from "./internal/executor.js"
-import { createMiddlewareChain } from "./internal/middleware-chain.js"
+import { buildActionEffect } from "./internal/next-action.js"
 import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import {
   captureCallSite,
@@ -78,23 +77,6 @@ export interface NextAction<
 
   setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, L, Middleware, S>
 
-  /**
-   * Build a pure Effect program without executing it. Useful for tests where
-   * you want to provide services and run with a custom runtime.
-   */
-  buildEffect<
-    E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
-  >(
-    handler: H
-  ): (
-    input: Input<NextAction<Tag, L, Middleware, InputA>>
-  ) => Effect<
-    ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never,
-    E,
-    ExtractProvides<NextAction<Tag, L, Middleware, InputA>>
-  >
-
   build<
     E extends CatchesFromMiddleware<Middleware>,
     H extends BuildHandlerWithError<NextAction<Tag, L, Middleware, InputA>, E>
@@ -144,40 +126,6 @@ const Proto = {
     })
   },
 
-  buildEffect(
-    this: AnyWithProps,
-    handler: (ctx: any) => Promise<Effect<any, any, any>>
-  ) {
-    const middlewares = this.middlewares
-    const inputSchema = this.inputSchema
-    const spanNameLocal = this._tag
-    const spanAttributesLocal = makeSpanAttributes("NextAction", this._tag)
-    return (inputArg: unknown) => {
-      return Effect_.gen(function*() {
-        const context = yield* Effect_.context<never>()
-        const rawInput = inputArg !== undefined ? inputArg : undefined
-        const input = inputSchema
-          ? Schema.decodeUnknown(inputSchema as any)(rawInput)
-          : rawInput
-        const payload = { input }
-        let handlerEffect = yield* Effect_.promise(() => handler(payload))
-        if (middlewares.length > 0) {
-          const options = { callerKind: "action" as const, input: payload.input }
-          const tags = middlewares
-          handlerEffect = createMiddlewareChain(
-            tags,
-            (tag) => Context.unsafeGet(context, tag),
-            handlerEffect,
-            spanNameLocal,
-            spanAttributesLocal,
-            options
-          )
-        }
-        return yield* handlerEffect
-      })
-    }
-  },
-
   build(
     this: AnyWithProps,
     handler: (ctx: any) => Promise<Effect<any, any, any>>
@@ -188,7 +136,15 @@ const Proto = {
     const errorDef = captureDefinitionSite()
     return async (inputArg: unknown) => {
       const errorCall = captureCallSite()
-      const program = Proto.buildEffect.call(this, handler)(inputArg)
+      const program = buildActionEffect(
+        {
+          middlewares: this.middlewares as ReadonlyArray<any>,
+          inputSchema: this.inputSchema as any,
+          spanName,
+          spanAttributes
+        },
+        handler as any
+      )(inputArg)
 
       const effectWithSpan = Effect_.withSpan(program, spanName, {
         captureStackTrace: makeCaptureCallSite(errorDef, errorCall),

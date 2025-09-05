@@ -2,7 +2,6 @@
  * @since 0.5.0
  */
 import type * as Context_ from "effect/Context"
-import * as Context from "effect/Context"
 import type { Effect } from "effect/Effect"
 import * as Effect_ from "effect/Effect"
 import type * as Layer from "effect/Layer"
@@ -11,7 +10,7 @@ import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
 import { executeWithRuntime } from "./internal/executor.js"
-import { createMiddlewareChain } from "./internal/middleware-chain.js"
+import { buildServerComponentEffect } from "./internal/next-server-component.js"
 import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import {
   captureCallSite,
@@ -78,25 +77,6 @@ export interface NextServerComponent<
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextServerComponent<Tag, L, Middleware | M>
 
-  /**
-   * Build a pure Effect program without executing it. Useful for tests.
-   */
-  buildEffect<Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-  ): () => Effect<Out | WrappedReturns<Middleware>, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-
-  buildEffect<Props, Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-  ): (
-    props: Props
-  ) => Effect<Out | WrappedReturns<Middleware>, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-
-  // props-less variant
-  build<Out, E extends CatchesFromMiddleware<Middleware>>(
-    handler: () => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
-  ): () => Promise<Out | WrappedReturns<Middleware>>
-
-  // props variant (infers Props from handler parameter)
   build<Props, Out, E extends CatchesFromMiddleware<Middleware>>(
     handler: (props: Props) => Effect<Out, E, ExtractProvides<NextServerComponent<Tag, L, Middleware>>>
   ): (props: Props) => Promise<Out | WrappedReturns<Middleware>>
@@ -106,33 +86,6 @@ const Proto = {
   [TypeId]: TypeId,
   pipe() {
     return pipeArguments(this, arguments)
-  },
-  buildEffect(
-    this: AnyWithProps,
-    handler: (ctx: any) => Effect<any, any, any>
-  ) {
-    const middlewares = this.middlewares
-    const spanNameLocal = this._tag
-    const spanAttributesLocal = makeSpanAttributes("NextServerComponent", this._tag)
-    return (props?: any) => {
-      return Effect_.gen(function*() {
-        const context = yield* Effect_.context<never>()
-        let handlerEffect = handler(props)
-        if (middlewares.length > 0) {
-          const options = { callerKind: "component" as const }
-          const tags = middlewares
-          handlerEffect = createMiddlewareChain(
-            tags,
-            (tag) => Context.unsafeGet(context, tag),
-            handlerEffect,
-            spanNameLocal,
-            spanAttributesLocal,
-            options
-          )
-        }
-        return yield* handlerEffect
-      })
-    }
   },
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
@@ -159,7 +112,14 @@ const Proto = {
     const errorDef = captureDefinitionSite()
     return (props?: any) => {
       const errorCall = captureCallSite()
-      const program = Proto.buildEffect.call(this, handler)(props)
+      const program = buildServerComponentEffect(
+        {
+          middlewares: this.middlewares as ReadonlyArray<any>,
+          spanName,
+          spanAttributes
+        },
+        handler as any
+      )(props)
 
       const effectWithSpan = Effect_.withSpan(program, spanName, {
         captureStackTrace: makeCaptureCallSite(errorDef, errorCall),

@@ -25,3 +25,13 @@ export default NextServerComponent.make("Base", TimeLive)
       return { time: { ...time, now: server.now + 1000 } }
     })
   )
+
+export const component = NextServerComponent.make("Base", TimeLive)
+  .middleware(TimeMiddleware)
+  .build(() =>
+    Effect.gen(function*() {
+      const server = yield* ServerTime
+
+      return { time: { now: server.now + 1000 } }
+    })
+  )

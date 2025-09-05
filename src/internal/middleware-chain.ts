@@ -9,12 +9,12 @@ import type * as NextMiddleware from "../NextMiddleware.js"
 export type MiddlewareChainOptionsBase =
   | {
     readonly callerKind: "page"
-    readonly params: Promise<Record<string, string | undefined>>
-    readonly searchParams: Promise<Record<string, string | undefined>>
+    readonly params: Promise<Record<string, string | Array<string> | undefined>>
+    readonly searchParams: Promise<Record<string, string | Array<string> | undefined>>
   }
   | {
     readonly callerKind: "layout"
-    readonly params: Promise<Record<string, string | undefined>>
+    readonly params: Promise<Record<string, string | Array<string> | undefined>>
     readonly children: unknown
   }
   | {
