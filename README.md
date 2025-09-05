@@ -17,16 +17,16 @@ Thin wrapper around Next.js App Router to build pages, layouts, server component
 >
 > - `yield* Next.decodeParams(schema)(props)`
 > - `yield* Next.decodeSearchParams(schema)(props)`
->   Read at the bottom of the README for more details for the decisions behind the new API.
+>
+> Read at the bottom of the README for more details for the decisions behind the new API.
 
 ### Why this library
 
-- **Next.js control flow preserved**: `redirect`, `permanentRedirect`, and `notFound` work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
+- **Next.js control flow preserved**: `redirect`, `notFound` etc.. work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
 - **Composable middlewares**: Add middlewares as `Context.Tag`s. Support for both provide-style and `wrap: true` middlewares, with typed `failure`/`catches`/`returns`.
 - **Dev HMR safety**: In development, previous `ManagedRuntime`s are disposed on hot reload to prevent resource leaks.
-- **Typed decoding helpers**: Opt-in helpers to parse `params`, `searchParams`, and action `input` using `Schema`.
+- **Typed decoding helpers**: Opt-in helpers to parse `params` and `searchParams` using `Schema`.
 - **Per-handler runtime**: Each page/layout/action/component runs on a `ManagedRuntime` built from your `Layer`.
-- **Next.js 15.5 compatible**: Plays nicely with the new route props helpers and common App Router patterns.
 - **Works with caching**: Pairs well with `@mcrovero/effect-react-cache` for cross-route Effect caching.
 
 ### Getting Started
@@ -202,9 +202,52 @@ const page = NextPage.make("Home", AppLive).build(
 )
 ```
 
+### Next.js Route Props Helpers Integration
+
+With Next.js 15.5, you can now use the globally available `PageProps` and `LayoutProps` types for fully typed route parameters without manual definitions. You can use them with this library as follows:
+
+```ts
+import * as Effect from "effect/Effect"
+import { NextPage, NextLayout } from "@mcrovero/effect-nextjs"
+
+// Page with typed route parameters
+const blogPage = NextPage.make("BlogPage", AppLive).build(
+  Effect.fn("BlogHandler")(function* (props: PageProps<"/blog/[slug]">) {
+    // Fully typed params with no manual interface definition
+    const { slug } = yield* Next.decodeParams(
+      Schema.Struct({
+        slug: Schema.String
+      })
+    )(props)
+
+    return (
+      <article>
+        <h1>Blog Post: {slug}</h1>
+        <p>Content for {slug}</p>
+      </article>
+    )
+  })
+)
+
+// Layout with parallel routes support
+const dashboardLayout = NextLayout.make("DashboardLayout", AppLive).build(
+  Effect.fn("DashboardLayout")(function* (props: LayoutProps<"/dashboard">) {
+    // Fully typed parallel route slots
+    return (
+      <div>
+        {props.children}
+        {props.analytics} {/* Fully typed */}
+        {props.team} {/* Fully typed */}
+      </div>
+    )
+  })
+)
+```
+
+See the official announcement: [Next.js 15.5 – Route Props Helpers](https://nextjs.org/blog/next-15-5#route-props-helpers)
+
 ### Why the new syntax
 
-- **Next.js Route Props Helpers**: Next.js now exposes globally available route props helpers (e.g. `PageProps`, `LayoutProps`) for fully typed route params and context. The new API keeps your handlers close to Next.js’ default patterns and plays nicely with these helpers. See the official announcement: [Next.js 15.5 – Route Props Helpers](https://nextjs.org/blog/next-15-5#route-props-helpers).
 - **Use `Effect.fn` directly**: The previous version was too opinionated and made it awkward to use `Effect.fn`. The new architecture embraces `Effect.fn` in handlers while preserving the library’s conveniences.
 - **Spans and tracing**: You can now get automatic spans around pages, layouts, actions, and server components using Effect official tracing mechanism.
 - **Flexible parsing**: Instead of embedding parsing, the library now provides lightweight helpers like `Next.decodeParams` and `Next.decodeSearchParams`. You can use them, or build your own.
