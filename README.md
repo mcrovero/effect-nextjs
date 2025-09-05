@@ -5,8 +5,28 @@
 
 > [!WARNING]
 > This library is in early alpha and is not ready for production use.
+>
+> ### Breaking changes (v0.10.0)
+>
+> This version changes the API to use the library, there is no more a global Next.make(Layer) that exposes .page()/.layout()/.action()/.component() methods. You now need to use: NextPage.make("page_key", Layer), NextLayout.make("layout_key", Layer), etc..
+> The keys must be unique across the same type components.
+> There are no more `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`.
+> You can now use the new helpers inside your handler:
+>
+> - `yield* Next.decodeParams(schema)(props)`
+> - `yield* Next.decodeSearchParams(schema)(props)`
+> - `yield* Next.decodeInput(schema)(input)`
+>   Read at the bottom of the README for more details for the decisions behind the new API.
 
-Typed helpers to build Next.js App Router pages, layouts, server components, and server actions with Effect. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
+### Why this library
+
+- **Next.js control flow preserved**: `redirect`, `permanentRedirect`, and `notFound` work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
+- **Composable middlewares**: Add middlewares as `Context.Tag`s. Support for both provide-style and `wrap: true` middlewares, with typed `failure`/`catches`/`returns`.
+- **Dev HMR safety**: In development, previous `ManagedRuntime`s are disposed on hot reload to prevent resource leaks.
+- **Typed decoding helpers**: Opt-in helpers to parse `params`, `searchParams`, and action `input` using `Schema`.
+- **Per-handler runtime**: Each page/layout/action/component runs on a `ManagedRuntime` built from your `Layer`.
+- **Next.js 15.5 compatible**: Plays nicely with the new route props helpers and common App Router patterns.
+- **Works with caching**: Pairs well with `@mcrovero/effect-react-cache` for cross-route Effect caching.
 
 ### Getting Started
 
@@ -21,9 +41,8 @@ pnpm add @mcrovero/effect-nextjs effect next
 ```ts
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-import * as Schema from "effect/Schema"
-import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { Layer, Schema } from "effect"
+import { Next, NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // A simple service
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -34,20 +53,28 @@ export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()("AuthMi
   failure: Schema.String
 }) {}
 
-// Live implementation for the middleware (typed R is inferred)
+// Live implementation for the middleware
 export const AuthLive = NextMiddleware.layer(AuthMiddleware, () => Effect.succeed({ id: "123", name: "Ada" }))
 
 // Combine all lives you need
 const AppLive = Layer.mergeAll(AuthLive)
 
 // Create a typed page handler
-export const page = NextPage.make("HomePage", AppLive)
-  .setParamsSchema(Schema.Struct({ id: Schema.String }))
+export const page = NextPage.make("BasePage", AppLive)
   .middleware(AuthMiddleware)
-  .build(({ params }) =>
-    Effect.gen(function* () {
+  .build(
+    Effect.fn("HomePage")(function* (props: {
+      params: Promise<Record<string, string | undefined>>
+      searchParams: Promise<Record<string, string | undefined>>
+    }) {
+      const { id } = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+
       const user = yield* CurrentUser
-      return <div>Hello {user.name}</div>
+      return (
+        <div>
+          Hello {user.name} (id: {id})
+        </div>
+      )
     })
   )
 ```
@@ -73,20 +100,18 @@ export default async function Page(props: {
 Notes
 
 - Use `NextLayout.make(tag, layer)`, `NextServerComponent.make(tag, layer)`, and `NextAction.make(tag, layer)` for layouts, server components, and server actions.
-- Validate search params with `.setSearchParamsSchema(...)` on pages, and action input with `.setInputSchema(...)` on actions.
+- Parse/validate values inside your handler using helpers: `Next.decodeParams(...)`, `Next.decodeSearchParams(...)`, and `Next.decodeInput(...)`.
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
-- Server actions: due to Next.js restrictions, the action handler must be declared with the `async` keyword. In this API, that means the function you pass to `.build(...)` for actions must be `async`, returning a Promise of an Effect.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
 ### Middlewares with dependencies
 
-Use `NextMiddleware.layer(tag, impl)` when your middleware needs other services. The layer will carry the implementation's environment in its `R` type so you can compose it safely.
+Use `NextMiddleware.layer(tag, impl)` when your middleware needs other services.
 
 ```ts
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-import * as Schema from "effect/Schema"
+import { Layer, Schema } from "effect"
 import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // Dependencies
@@ -129,8 +154,7 @@ Wrapped middlewares (`wrap: true`) receive a `next` Effect to run when they deci
 ```ts
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-import * as Schema from "effect/Schema"
+import { Layer, Schema } from "effect"
 import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -141,16 +165,13 @@ export class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", {
   wrap: true
 }) {}
 
-const WrappedLive = Layer.succeed(
-  Wrapped,
-  Wrapped.of(({ next }) =>
-    Effect.gen(function* () {
-      // pre logic...
-      const out = yield* Effect.provideService(next, CurrentUser, { id: "u1", name: "Ada" })
-      // post logic...
-      return out
-    })
-  )
+const WrappedLive = NextMiddleware.layer(Wrapped, ({ next }) =>
+  Effect.gen(function* () {
+    // pre logic...
+    const out = yield* Effect.provideService(next, CurrentUser, { id: "u1", name: "Ada" })
+    // post logic...
+    return out
+  })
 )
 
 const AppLive = Layer.mergeAll(WrappedLive)
@@ -161,23 +182,33 @@ const page = NextPage.make("Home", AppLive)
 
 ### Parsing params, searchParams and input
 
-Use `Schema` to validate/transform values automatically before your handler runs.
+Use `Schema` to validate/transform values explicitly inside your handler.
 
 ```ts
-import * as Schema from "effect/Schema"
-import { NextPage, NextAction, NextServerComponent } from "@mcrovero/effect-nextjs"
+import { Schema } from "effect"
+import { Next, NextPage, NextAction, NextServerComponent } from "@mcrovero/effect-nextjs"
 
 // Params and searchParams (Page)
-const page = NextPage.make("Home", AppLive)
-  .setParamsSchema(Schema.Struct({ id: Schema.String }))
-  .setSearchParamsSchema(Schema.Struct({ q: Schema.optional(Schema.String) }))
-  .build(({ params, searchParams }) => Effect.succeed({ params, searchParams }))
+const page = NextPage.make("Home", AppLive).build(
+  Effect.fn("Home")(function* (props: {
+    params: Promise<Record<string, string | undefined>>
+    searchParams: Promise<Record<string, string | undefined>>
+  }) {
+    const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+    const searchParams = yield* Next.decodeSearchParams(Schema.Struct({ q: Schema.optional(Schema.String) }))(props)
+    return { params, searchParams }
+  })
+)
 
 // Input (Action)
-// IMPORTANT: The action handler must be async because of Next.js server action requirements
-const action = NextAction.make("DoSomething", AppLive)
-  .setInputSchema(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))
-  .build(async ({ input }) => Effect.succeed({ ok: true, input }))
+const action = NextAction.make("DoSomething", AppLive).build(({ input }: { input: unknown }) =>
+  Effect.gen(function* () {
+    const parsed = yield* Next.decodeInput(Schema.Struct({ count: Schema.Number, tags: Schema.Array(Schema.String) }))(
+      input
+    )
+    return { ok: true, input: parsed }
+  })
+)
 
 // Server Component (with props):
 export default NextServerComponent.make("ServerInfo", AppLive).build(({ time }: { time: { now: number } }) =>
@@ -190,6 +221,11 @@ export default NextServerComponent.make("ServerInfo", AppLive).build(({ time }: 
 export const component = NextServerComponent.make("ServerInfo", AppLive).build(() => Effect.succeed({ ok: true }))
 ```
 
-### OpenTelemetry
+> ### Why the new syntax
+>
+> - **Next.js Route Props Helpers**: Next.js now exposes globally available route props helpers (e.g. `PageProps`, `LayoutProps`) for fully typed route params and context. The new API keeps your handlers close to Next.js’ default patterns and plays nicely with these helpers. See the official announcement: [Next.js 15.5 – Route Props Helpers](https://nextjs.org/blog/next-15-5#route-props-helpers).
+> - **Use `Effect.fn` directly**: The previous version was too opinionated and made it awkward to use `Effect.fn`. The new architecture embraces `Effect.fn` in handlers while preserving the library’s conveniences.
+> - **Spans and tracing**: You still get automatic spans around pages, layouts, actions, and server components, leveraging Effect’s default tracing mechanism.
+> - **Flexible parsing**: Instead of embedding parsing, the library now provides lightweight helpers like `Next.decodeParams` and `Next.decodeSearchParams`. You can use them, or build your own.
 
-The library automatically creates spans around pages, layouts, actions, server components, and middlewares.
+Thin wrapper around Next.js App Router to build pages, layouts, server components, and server actions in the Effect world. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.

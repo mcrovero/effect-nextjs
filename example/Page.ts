@@ -2,7 +2,7 @@ import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { ParseError } from "effect/ParseResult"
-import { decodeParams } from "src/Next.js"
+import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 import * as NextPage from "../src/NextPage.js"
 
@@ -13,9 +13,9 @@ export class ProvideUser extends NextMiddleware.Tag<ProvideUser>()(
   { provides: CurrentUser, failure: Schema.String }
 ) {}
 
-const ProvideUserLive = Layer.succeed(
+const ProvideUserLive = NextMiddleware.layer(
   ProvideUser,
-  ProvideUser.of(() => Effect.succeed({ id: "u-1", name: "Alice" }))
+  () => Effect.succeed({ id: "u-1", name: "Alice" })
 )
 
 export class CatchAll extends NextMiddleware.Tag<CatchAll>()(
@@ -43,8 +43,8 @@ const page = BasePage
   .middleware(ProvideUser)
   .middleware(CatchAll)
   .build(
-    Effect.fn("HomePage")(function*(props: { params: Promise<{ id: string }> }) {
-      const params = yield* decodeParams(Schema.Struct({ id: Schema.String }))(props)
+    Effect.fn("HomePage")(function*(props: { params: Promise<Record<string, string | undefined>> }) {
+      const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
       return `Hello ${params.id}!`
     })
   )
