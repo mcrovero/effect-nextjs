@@ -1,5 +1,11 @@
 /**
  * @since 0.5.0
+ * @category decode
+ */
+export * as Next from "./Next.js"
+
+/**
+ * @since 0.5.0
  */
 export * as NextAction from "./NextAction.js"
 

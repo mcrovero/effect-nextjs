@@ -4,6 +4,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import { decodeInput } from "../src/Next.js"
 import * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
@@ -22,16 +23,15 @@ describe("NextAction", () => {
   it.effect("runs handler with provided services and decoded input", () =>
     Effect.gen(function*() {
       const action = NextAction.make("Base", AuthLive)
-        .setInputSchema(Schema.Struct({ id: Schema.Number }))
         .middleware(AuthMiddleware)
 
       const result = yield* Effect.promise(() =>
-        action.build(async ({ input }) =>
+        action.build((input: { id: number }) =>
           Effect.gen(function*() {
             const user = yield* CurrentUser
-            const decoded = yield* input
+            const decoded = yield* decodeInput(Schema.Struct({ id: Schema.Number }))(input)
             return { user, input: decoded }
-          }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
+          }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
         )({ id: 1 })
       )
 
@@ -42,14 +42,13 @@ describe("NextAction", () => {
     Effect.gen(function*() {
       const result = yield* Effect.promise(() =>
         NextAction.make("Submit", AuthLive)
-          .setInputSchema(Schema.Struct({ id: Schema.NumberFromString }))
           .middleware(AuthMiddleware)
-          .build(async ({ input }) =>
+          .build((input: { id: string }) =>
             Effect.gen(function*() {
               const user = yield* CurrentUser
-              const decoded = yield* input
+              const decoded = yield* decodeInput(Schema.Struct({ id: Schema.NumberFromString }))(input)
               return { user, input: decoded }
-            }).pipe(Effect.catchTag("ParseError", (e) => Effect.succeed({ error: e })))
+            }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
           )({ id: "1" })
       )
 

@@ -142,7 +142,7 @@ describe("Middleware ordering", () => {
         .middleware(NonWrapped)
 
       const result = yield* Effect.promise(() =>
-        action.build(async () =>
+        action.build(() =>
           Effect.gen(function*() {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"

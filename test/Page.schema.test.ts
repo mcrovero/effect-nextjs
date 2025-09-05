@@ -4,6 +4,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import { decodeParams, decodeSearchParams } from "../src/Next.js"
 import * as NextPage from "../src/NextPage.js"
 
 describe("NextPage schema failures", () => {
@@ -12,10 +13,14 @@ describe("NextPage schema failures", () => {
 
   it.effect("rejects on invalid params schema", () =>
     Effect.gen(function*() {
-      const page = app.setParamsSchema(Schema.Struct({ id: Schema.Number }))
       const either = yield* Effect.tryPromise({
         try: () =>
-          page.build(({ params }) => Effect.flatMap(Effect.orDie(params), () => Effect.succeed("ok" as const)))({
+          app.build(({ params }) =>
+            Effect.gen(function*() {
+              const _decoded = yield* decodeParams(Schema.Struct({ id: Schema.Number }))({ params })
+              return "ok" as const
+            })
+          )({
             params: Promise.resolve({ id: "not-a-number" }),
             searchParams: Promise.resolve({})
           }),
@@ -26,11 +31,13 @@ describe("NextPage schema failures", () => {
 
   it.effect("rejects on invalid searchParams schema", () =>
     Effect.gen(function*() {
-      const page = app.setSearchParamsSchema(Schema.Struct({ q: Schema.Number }))
       const either = yield* Effect.tryPromise({
         try: () =>
-          page.build(({ searchParams }) =>
-            Effect.flatMap(Effect.orDie(searchParams), () => Effect.succeed("ok" as const))
+          app.build(({ searchParams }) =>
+            Effect.gen(function*() {
+              const _decoded = yield* decodeSearchParams(Schema.Struct({ q: Schema.Number }))({ searchParams })
+              return "ok" as const
+            })
           )({
             params: Promise.resolve({}),
             searchParams: Promise.resolve({ q: "nope" })

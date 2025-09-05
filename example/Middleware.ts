@@ -46,15 +46,9 @@ const _NotWrappedLive = Layer.succeed(
 const ProdLive = Layer.mergeAll(_WrappedLive, _NotWrappedLive)
 
 const _page = NextPage.make("Base", ProdLive)
-  .setParamsSchema(Schema.Struct({
-    id: Schema.String
-  }))
-  // .setSearchParamsSchema(Schema.Struct({
-  //   id: Schema.String
-  // }))
   .middleware(WrappedMiddleware)
   .middleware(NotWrappedMiddleware)
-  .build(({ params }) =>
+  .build(({ params }: { params: Promise<{ id: string }> }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
       yield* Effect.fail("error")
@@ -62,4 +56,4 @@ const _page = NextPage.make("Base", ProdLive)
     }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
   )
 
-console.log(await _page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) }))
+console.log(await _page({ params: Promise.resolve({ id: "abc" }) }))
