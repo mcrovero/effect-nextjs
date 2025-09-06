@@ -26,7 +26,7 @@ export function internalBuild<
 ): Promise<O> {
   const runtime = outerThis.runtime
   const actualSpanName = spanName || outerThis._tag
-  const spanAttributes = makeSpanAttributes("NextAction", outerThis._tag)
+  const spanAttributes = makeSpanAttributes(outerThis._tag)
   const middlewares = outerThis.middlewares
 
   const program = Effect_.gen(function*() {

@@ -3,14 +3,14 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { vi } from "vitest"
+import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import * as NextPage from "../src/NextPage.js"
 
-describe("NextPage defects", () => {
+describe("Next defects", () => {
   it.effect("logs die from handler", () =>
     Effect.gen(function*() {
       class Dummy0 extends Context.Tag("Dummy0")<Dummy0, object>() {}
-      const page = NextPage.make("Base", Layer.succeed(Dummy0, {}))
+      const page = Next.make("Base", Layer.succeed(Dummy0, {}))
 
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
       try {
@@ -51,7 +51,7 @@ describe("NextPage defects", () => {
 
       const app = Layer.mergeAll(Layer.succeed(Dummy, {}), DefectLive)
 
-      const page = NextPage.make("Base", app)
+      const page = Next.make("Base", app)
         .middleware(DefectMiddleware)
 
       const either = yield* Effect.tryPromise({

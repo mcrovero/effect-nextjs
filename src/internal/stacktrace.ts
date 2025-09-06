@@ -58,16 +58,13 @@ export const makeCaptureCallSite = (errorDef: Error, errorCall: Error): () => st
  * @category utils
  */
 export const makeSpanAttributes = (
-  component: "NextPage" | "NextLayout" | "NextAction" | "NextServerComponent",
   tag: string
 ): Readonly<{
   readonly library: "@mcrovero/effect-nextjs"
-  readonly component: string
   readonly tag: string
 }> =>
   ({
     library: "@mcrovero/effect-nextjs",
-    component,
     tag
   }) as const
 
