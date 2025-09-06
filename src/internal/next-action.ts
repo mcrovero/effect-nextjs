@@ -35,15 +35,12 @@ export function internalBuild<
     let handlerEffect = programEffect
 
     if (middlewares.length > 0) {
-      const options = {
-        callerKind: "action" as const
-      }
       const tags = middlewares
       handlerEffect = createMiddlewareChain(
         tags,
         (tag) => Context_.unsafeGet(context, tag),
         handlerEffect,
-        options
+        { props: undefined }
       )
     }
     return yield* handlerEffect

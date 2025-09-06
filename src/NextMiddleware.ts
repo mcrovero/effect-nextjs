@@ -22,18 +22,7 @@ export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Middlew
 export type TypeId = typeof TypeId
 
 type MiddlewareOptions = {
-  readonly callerKind: "page"
-  readonly params: Promise<Record<string, string | Array<string> | undefined>>
-  readonly searchParams: Promise<Record<string, string | Array<string> | undefined>>
-} | {
-  readonly callerKind: "layout"
-  readonly params: Promise<Record<string, string | Array<string> | undefined>>
-  readonly children: unknown
-} | {
-  readonly callerKind: "action"
-  readonly input?: unknown
-} | {
-  readonly callerKind: "component"
+  props: unknown
 }
 
 /**

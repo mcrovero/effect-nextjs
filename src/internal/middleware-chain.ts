@@ -6,33 +6,11 @@ import type * as NextMiddleware from "../NextMiddleware.js"
  * @since 0.5.0
  * @category utils
  */
-export type MiddlewareChainOptionsBase =
-  | {
-    readonly callerKind: "page"
-    readonly params: Promise<Record<string, string | Array<string> | undefined>>
-    readonly searchParams: Promise<Record<string, string | Array<string> | undefined>>
-  }
-  | {
-    readonly callerKind: "layout"
-    readonly params: Promise<Record<string, string | Array<string> | undefined>>
-    readonly children: unknown
-  }
-  | {
-    readonly callerKind: "action"
-  }
-  | {
-    readonly callerKind: "component"
-  }
-
-/**
- * @since 0.5.0
- * @category utils
- */
 export const createMiddlewareChain = (
   tags: ReadonlyArray<NextMiddleware.TagClassAny>,
   resolve: (tag: NextMiddleware.TagClassAny) => any,
   base: Effect<any, any, any>,
-  options: MiddlewareChainOptionsBase
+  options: { props: unknown }
 ): Effect<any, any, any> => {
   const buildChain = (index: number): Effect<any, any, any> => {
     if (index >= tags.length) {
