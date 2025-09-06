@@ -1,6 +1,6 @@
 # @mcrovero/effect-nextjs
 
-## 0.7.0
+## 0.10.0
 
 ### Minor Changes
 
