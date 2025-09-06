@@ -23,7 +23,7 @@ const AuthLive = Layer.succeed(
 )
 
 // Action with tracing span
-const _actionTraced = async (input: { test: string }) =>
+export const actionTraced = async (input: { test: string }) =>
   NextAction.make("Base", AuthLive)
     .middleware(AuthMiddleware)
     .runFn(
@@ -35,7 +35,7 @@ const _actionTraced = async (input: { test: string }) =>
     )
 
 // Action without tracing span
-const _actionUntraced = async (input: { test: string }) =>
+export const actionUntraced = async (input: { test: string }) =>
   NextAction.make("Base", AuthLive)
     .middleware(AuthMiddleware)
     .run(
@@ -47,7 +47,8 @@ const _actionUntraced = async (input: { test: string }) =>
 
 // Action traced with Effect.fn
 type Input = { test: string }
-const _actionFn = async (props: Input) =>
+
+export const actionFn = async (props: Input) =>
   NextAction.make("Base", AuthLive)
     .middleware(AuthMiddleware).run(
       Effect.fn("Action")(function*(input: Input) {
@@ -61,10 +62,9 @@ const effect = Effect.fn("Action")(function*(input: Input) {
   const user = yield* CurrentUser
   return { user, parsed: input.test }
 })
-const _actionFn2 = async (props: Input) =>
+
+export const actionFn2 = async (props: Input) =>
   NextAction.make("Base", AuthLive)
     .middleware(AuthMiddleware).run(
       effect(props)
     )
-
-console.log(_actionFn2)
