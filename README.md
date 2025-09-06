@@ -288,9 +288,7 @@ export const updateName = async (input: Input) =>
     )
 ```
 
-Using `Effect.fn` with actions
-
-`Effect.fn` also works with actions, it is just more boilerplate to write it manually:
+Using `Effect.fn` with actions and Next .build() method, it is just more boilerplate to write it manually:
 
 ```ts
 type Input = { test: string }
@@ -299,7 +297,7 @@ const effect = Effect.fn("ExampleAction")(function* (props: Input) {
   return { user, parsed: props.test }
 })
 export const actionWithFn = async (input: Input) =>
-  NextAction.make("ExampleWithFn", AppLive).middleware(Auth).run(effect(input))
+  Next.make("ExampleWithFn", AppLive).middleware(Auth).build(effect)(input)
 ```
 
 ### Next.js Route Props Helpers Integration

@@ -1,6 +1,7 @@
 import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import { Next } from "src/index.js"
 import * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
@@ -49,13 +50,13 @@ export const actionUntraced = async (input: { test: string }) =>
 type Input = { test: string }
 
 export const actionFn = async (props: Input) =>
-  NextAction.make("Base", AuthLive)
-    .middleware(AuthMiddleware).run(
+  Next.make("Base", AuthLive)
+    .middleware(AuthMiddleware).build(
       Effect.fn("Action")(function*(input: Input) {
         const user = yield* CurrentUser
         return { user, parsed: input.test }
-      })(props)
-    )
+      })
+    )(props)
 
 // Or
 const effect = Effect.fn("Action")(function*(input: Input) {
@@ -64,7 +65,7 @@ const effect = Effect.fn("Action")(function*(input: Input) {
 })
 
 export const actionFn2 = async (props: Input) =>
-  NextAction.make("Base", AuthLive)
-    .middleware(AuthMiddleware).run(
-      effect(props)
-    )
+  Next.make("Base", AuthLive)
+    .middleware(AuthMiddleware).build(
+      effect
+    )(props)
