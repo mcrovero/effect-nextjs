@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.12.0
+
+### Minor Changes
+
+- [#36](https://github.com/mcrovero/effect-nextjs/pull/36) [`d6d7633`](https://github.com/mcrovero/effect-nextjs/commit/d6d76333fa912eae137b4944fa1d4a1473c2d6fb) Thanks @mcrovero! - Added support for Next.js routes. Now Next accepts a list of arguments and middlewares receive props from calling component
+
 ## 0.11.0
 
 ### Minor Changes
