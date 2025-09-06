@@ -10,7 +10,7 @@ Wrapper around Next.js App Router to build pages, layouts, server components, an
 >
 > ### Breaking changes (v0.11.0)
 >
-> - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, and server components. `NextPage.make`, `NextLayout.make`, and `NextServerComponent.make` have been removed.
+> - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, and server components. `Next.make().actions()/.layout()/.component()`, `NextPage`, `NextLayout`, and `NextServerComponent` have been removed.
 > - Actions: continue to use `NextAction.make(tag, layer)` for server actions. There is no `.build()` for actions; call `.run(...)` / `.runFn(...)` inside the exported async function.
 > - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. Use the helpers inside your handler:
 >   - `yield* Next.decodeParams(schema)(props)`
