@@ -26,12 +26,7 @@ describe("Next wrap middleware", () => {
       const app = Next.make("Base", Layer.mergeAll(Layer.succeed(Dummy, { id: "1" }), WrapLive))
       const page = app.middleware(Wrap)
 
-      const res = yield* Effect.promise(() =>
-        page.build(() => Effect.succeed("original" as const))({
-          params: Promise.resolve({}),
-          searchParams: Promise.resolve({})
-        })
-      )
+      const res = yield* Effect.promise(() => page.build(() => Effect.succeed("original" as const))())
 
       assertEquals(res, "overridden")
     }))

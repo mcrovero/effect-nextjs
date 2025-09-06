@@ -49,7 +49,7 @@ describe("Middleware ordering", () => {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"
           })
-        )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
+        )()
       )
 
       strictEqual(result, "ok")
@@ -96,7 +96,7 @@ describe("Middleware ordering", () => {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"
           })
-        )({ params: Promise.resolve({}), children: null })
+        )()
       )
 
       strictEqual(result, "ok")
@@ -193,7 +193,7 @@ describe("Middleware ordering", () => {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"
           })
-        )({})
+        )()
       )
 
       strictEqual(result, "ok")

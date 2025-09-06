@@ -20,7 +20,7 @@ describe("Next defects", () => {
               Effect.catchAllCause(Effect.logError),
               Effect.as("ok")
             )
-          )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
+          )()
         )
 
         assert.strictEqual(result, "ok")
@@ -55,11 +55,7 @@ describe("Next defects", () => {
         .middleware(DefectMiddleware)
 
       const either = yield* Effect.tryPromise({
-        try: () =>
-          page.build(() => Effect.succeed("ok" as const))({
-            params: Promise.resolve({}),
-            searchParams: Promise.resolve({})
-          }),
+        try: () => page.build(() => Effect.succeed("ok" as const))(),
         catch: (e) => e as Error
       }).pipe(Effect.either)
 

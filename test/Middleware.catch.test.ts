@@ -33,7 +33,7 @@ describe("Middleware catches", () => {
           Effect.gen(function*() {
             return yield* Effect.fail("boom")
           })
-        )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
+        )()
       )
 
       strictEqual(result, "Catched: boom")

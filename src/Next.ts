@@ -115,14 +115,14 @@ export interface Next<
   ): Next<Tag, L, Middleware | M>
 
   build<
-    I,
+    A extends Array<any>,
     O
   >(
-    handler: BuildHandler<Next<Tag, L, Middleware>, I, O>
+    handler: BuildHandler<Next<Tag, L, Middleware>, A, O>
   ): (
-    args: I
+    ...args: A
   ) => Promise<
-    ReturnType<BuildHandler<Next<Tag, L, Middleware>, I, O>> extends Effect.Effect<infer _A, any, any> ?
+    ReturnType<BuildHandler<Next<Tag, L, Middleware>, A, O>> extends Effect.Effect<infer _A, any, any> ?
       _A | WrappedReturns<Middleware> :
       never
   >
@@ -146,35 +146,30 @@ const Proto = {
   },
 
   build<
-    I extends NextBaseProps,
+    A extends Array<any>,
     O
   >(
     this: AnyWithProps,
     handler: (
-      payload: I
+      ...args: A
     ) => Effect.Effect<O, any, any>
   ) {
     const runtime = this.runtime
-    return async (props: I) => {
+    return async (...args: A) => {
       const middlewares = this.middlewares
 
       const program = Effect.gen(function*() {
         const context = yield* Effect.context<never>()
 
-        let handlerEffect = handler(props)
+        let handlerEffect = handler(...args)
 
         if (middlewares.length > 0) {
-          const options = {
-            callerKind: "page" as const,
-            params: props.params,
-            searchParams: props.searchParams
-          }
           const tags = middlewares
           handlerEffect = createMiddlewareChain(
             tags,
             (tag) => Context_.unsafeGet(context, tag),
             handlerEffect,
-            options
+            { props: args }
           )
         }
         return yield* handlerEffect
@@ -237,7 +232,8 @@ type ExtractProvides<R extends Any> = R extends Next<
     | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
-type BuildHandler<P extends Any, I, O> = P extends Next<infer _Tag, infer _Layer, infer _Middleware> ? (
-    args: I
+type BuildHandler<P extends Any, A extends Array<any>, O> = P extends
+  Next<infer _Tag, infer _Layer, infer _Middleware> ? (
+    ...args: A
   ) => Effect.Effect<O, CatchesFromMiddleware<_Middleware>, ExtractProvides<P>> :
   never
