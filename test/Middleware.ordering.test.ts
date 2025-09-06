@@ -142,12 +142,12 @@ describe("Middleware ordering", () => {
         .middleware(NonWrapped)
 
       const result = yield* Effect.promise(() =>
-        action.build(() =>
+        action.run(
           Effect.gen(function*() {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"
           })
-        )({})
+        )
       )
 
       strictEqual(result, "ok")

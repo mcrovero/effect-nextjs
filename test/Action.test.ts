@@ -19,37 +19,38 @@ describe("NextAction", () => {
     AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "John Doe" }))
   )
 
-  it.effect("runs handler with provided services and decoded input", () =>
+  it.effect("runs handler with provided services", () =>
     Effect.gen(function*() {
       const action = NextAction.make("Base", AuthLive)
         .middleware(AuthMiddleware)
 
       const result = yield* Effect.promise(() =>
-        action.build((input: { id: number }) =>
+        action.run(
           Effect.gen(function*() {
             const user = yield* CurrentUser
-            return { user, input }
+            return { user }
           }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
-        )({ id: 1 })
+        )
       )
 
-      deepStrictEqual(result, { user: { id: "123", name: "John Doe" }, input: { id: 1 } })
+      deepStrictEqual(result, { user: { id: "123", name: "John Doe" } })
     }))
 
-  it.effect("accepts input as encoded and uses it decoded", () =>
+  it.effect("runs traced handler with provided services (runFn)", () =>
     Effect.gen(function*() {
+      const action = NextAction.make("Base", AuthLive)
+        .middleware(AuthMiddleware)
+
       const result = yield* Effect.promise(() =>
-        NextAction.make("Submit", AuthLive)
-          .middleware(AuthMiddleware)
-          .build((input: { id: string }) =>
-            Effect.gen(function*() {
-              const user = yield* CurrentUser
-              const decoded = yield* Schema.decode(Schema.Struct({ id: Schema.NumberFromString }))(input)
-              return { user, input: decoded }
-            }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
-          )({ id: "1" })
+        action.runFn(
+          "Action",
+          Effect.gen(function*() {
+            const user = yield* CurrentUser
+            return { user }
+          }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
+        )
       )
 
-      deepStrictEqual(result, { user: { id: "123", name: "John Doe" }, input: { id: 1 } })
+      deepStrictEqual(result, { user: { id: "123", name: "John Doe" } })
     }))
 })

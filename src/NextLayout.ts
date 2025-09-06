@@ -83,8 +83,6 @@ export interface NextLayout<
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly paramsSchema?: AnySchema
 
-  withRuntime(runtime: ManagedRuntime.ManagedRuntime<any, any>): NextLayout<Tag, L, Middleware>
-
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextLayout<Tag, L, Middleware | M>
@@ -111,13 +109,6 @@ const Proto = {
   [TypeId]: TypeId,
   pipe() {
     return pipeArguments(this, arguments)
-  },
-  withRuntime(this: AnyWithProps, runtime: ManagedRuntime.ManagedRuntime<any, any>) {
-    return makeProto({
-      _tag: this._tag,
-      runtime,
-      middlewares: this.middlewares
-    })
   },
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({

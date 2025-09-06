@@ -1,6 +1,6 @@
 # @mcrovero/effect-nextjs
 
-Thin wrapper around Next.js App Router to build pages, layouts, server components, and server actions in the Effect world. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
+Wrapper around Next.js App Router to build pages, layouts, server components, and server actions in the Effect world. Compose middlewares as `Context.Tag`s, validate params/search params/input with `Schema`, and build your `Effect` programs with a single call.
 
 [![npm version](https://img.shields.io/npm/v/%40mcrovero%2Feffect-nextjs.svg?logo=npm&label=npm)](https://www.npmjs.com/package/@mcrovero/effect-nextjs)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -18,12 +18,15 @@ Thin wrapper around Next.js App Router to build pages, layouts, server component
 > - `yield* Next.decodeParams(schema)(props)`
 > - `yield* Next.decodeSearchParams(schema)(props)`
 >
+> The actions API has changed, there is no more .build() look at the examples for the new API.
+>
 > Read at the bottom of the README for more details for the decisions behind the new API.
 
 ### Why this library
 
-- **Next.js control flow preserved**: `redirect`, `notFound` etc.. work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
+- **End to end Effect**: You can bring effect gains up to the edge of your nextjs server.
 - **Composable middlewares**: Add middlewares as `Context.Tag`s. Support for both provide-style and `wrap: true` middlewares, with typed `failure`/`catches`/`returns`.
+- **Next.js control flow preserved**: `redirect`, `notFound` etc.. work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
 - **Dev HMR safety**: In development, previous `ManagedRuntime`s are disposed on hot reload to prevent resource leaks.
 - **Typed decoding helpers**: Opt-in helpers to parse `params` and `searchParams` using `Schema`.
 - **Per-handler runtime**: Each page/layout/action/component runs on a `ManagedRuntime` built from your `Layer`.
@@ -202,6 +205,71 @@ const page = NextPage.make("Home", AppLive).build(
 )
 ```
 
+### Server actions
+
+Next.js requires every exported server action to be an async function at the export site. Because of this, actions are handled slightly differently than pages, layouts and server components.
+
+Use `NextAction.make(...).run(...)` or `NextAction.make(...).runFn(...)` to produce an async function that you can export directly.
+
+- **run**: returns an async function, no tracing span.
+- **runFn**: returns an async function and also creates a named tracing span (similar to `Effect.fn`).
+
+Basic example:
+
+```ts
+import * as Effect from "effect/Effect"
+import { Layer } from "effect"
+import * as Context from "effect/Context"
+import { NextAction, NextMiddleware } from "@mcrovero/effect-nextjs"
+
+export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
+
+export class Auth extends NextMiddleware.Tag<Auth>()("Auth", {
+  provides: CurrentUser
+}) {}
+
+const AuthLive = NextMiddleware.layer(Auth, () => Effect.succeed({ id: "u1", name: "Ada" }))
+const AppLive = Layer.mergeAll(AuthLive)
+
+// Export an async server action
+export const action = async (input: Input) =>
+  NextAction.make("UpdateName", AppLive)
+    .middleware(Auth)
+    .run(
+      Effect.gen(function* () {
+        const user = yield* CurrentUser
+        return { ok: true, user }
+      })
+    )
+
+// With inputs and tracing span
+type Input = { name: string }
+export const updateName = async (input: Input) =>
+  NextAction.make("UpdateNameWithSpan", AppLive)
+    .middleware(Auth)
+    .runFn(
+      "UpdateName",
+      Effect.gen(function* () {
+        const user = yield* CurrentUser
+        return { ok: true, name: input.name, by: user.id }
+      })
+    )
+```
+
+Using `Effect.fn` with actions
+
+`Effect.fn` also works with actions, it is just more boilerplate to write it manually:
+
+```ts
+type Input = { test: string }
+const effect = Effect.fn("ExampleAction")(function* (props: Input) {
+  const user = yield* CurrentUser
+  return { user, parsed: props.test }
+})
+export const actionWithFn = async (input: Input) =>
+  NextAction.make("ExampleWithFn", AppLive).middleware(Auth).run(effect(input))
+```
+
 ### Next.js Route Props Helpers Integration
 
 With Next.js 15.5, you can now use the globally available `PageProps` and `LayoutProps` types for fully typed route parameters without manual definitions. You can use them with this library as follows:
@@ -213,13 +281,7 @@ import { NextPage, NextLayout } from "@mcrovero/effect-nextjs"
 // Page with typed route parameters
 const blogPage = NextPage.make("BlogPage", AppLive).build(
   Effect.fn("BlogHandler")(function* (props: PageProps<"/blog/[slug]">) {
-    // Fully typed params with no manual interface definition
-    const { slug } = yield* Next.decodeParams(
-      Schema.Struct({
-        slug: Schema.String
-      })
-    )(props)
-
+    const { slug } = Effect.promise(() => props.params)
     return (
       <article>
         <h1>Blog Post: {slug}</h1>
@@ -244,10 +306,20 @@ const dashboardLayout = NextLayout.make("DashboardLayout", AppLive).build(
 )
 ```
 
-See the official announcement: [Next.js 15.5 – Route Props Helpers](https://nextjs.org/blog/next-15-5#route-props-helpers)
+See the official documentation: - [Next.js 15.5 – Route Props Helpers](https://nextjs.org/docs/app/getting-started/layouts-and-pages#route-props-helpers)
 
-### Why the new syntax
+### Why the new syntax?
 
-- **Use `Effect.fn` directly**: The previous version was too opinionated and made it awkward to use `Effect.fn`. The new architecture embraces `Effect.fn` in handlers while preserving the library’s conveniences.
-- **Spans and tracing**: You can now get automatic spans around pages, layouts, actions, and server components using Effect official tracing mechanism.
-- **Flexible parsing**: Instead of embedding parsing, the library now provides lightweight helpers like `Next.decodeParams` and `Next.decodeSearchParams`. You can use them, or build your own.
+#### Less Opinionated
+
+In the previous version the library was adding too many layers of abstractions, and the scope was too broad. Now it is more focused on the core functionality, and less opinionated. For example in the previous version it was always decoding input from server actions, that, even though it is a good practice, it should not be responsibility of the library and it is now left to the user to decide how to parse the input, decode params/search params, etc. The library provides helpers to do so, but it is up to the user to decide how to use them.
+
+#### Closer to Next.js APIs
+
+With the newest Next.js 15.5 release, and the new `PageProps`/`LayoutProps` types, it is clear that the library should have dynamic props instead of pre-defined ones that we pre-process. This will make it easier to follow the Next.js updates and make the library more flexible.
+For example in the previous version it was not possible to access parallel routes slots in layouts.
+
+#### The Effect way
+
+With the new architecture it also enables a more Effect-like way to build handlers. It is now possible to use `Effect.fn` directly inside the handler, delegating to the official ways to do tracing, logging, etc.
+The only exception is server actions, because of the export requirements of Next.js that hopefully will be addressed in the future and the current .run and .runFn methods will be replaced by a single .build method like the other handlers.

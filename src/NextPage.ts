@@ -84,8 +84,6 @@ export interface NextPage<
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
 
-  withRuntime(runtime: ManagedRuntime.ManagedRuntime<any, any>): NextPage<Tag, L, Middleware>
-
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): NextPage<Tag, L, Middleware | M>
@@ -112,13 +110,6 @@ const Proto = {
   [TypeId]: TypeId,
   pipe() {
     return pipeArguments(this, arguments)
-  },
-  withRuntime(this: AnyWithProps, runtime: ManagedRuntime.ManagedRuntime<any, any>) {
-    return makeProto({
-      _tag: this._tag,
-      runtime,
-      middlewares: this.middlewares
-    })
   },
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     return makeProto({
