@@ -2,8 +2,8 @@ import { Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
+import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import * as NextPage from "../src/NextPage.js"
 
 // A simple context tag for the current user
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -45,7 +45,7 @@ const _NotWrappedLive = Layer.succeed(
 
 const ProdLive = Layer.mergeAll(_WrappedLive, _NotWrappedLive)
 
-const _page = NextPage.make("Base", ProdLive)
+const _page = Next.make("Base", ProdLive)
   .middleware(WrappedMiddleware)
   .middleware(NotWrappedMiddleware)
   .build(({ params }: { params: Promise<{ id: string }> }) =>

@@ -2,11 +2,9 @@ import { describe, it } from "@effect/vitest"
 import { deepStrictEqual, strictEqual } from "@effect/vitest/utils"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Next from "../src/Next.js"
 import * as NextAction from "../src/NextAction.js"
-import * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import * as NextPage from "../src/NextPage.js"
-import * as NextServerComponent from "../src/NextServerComponent.js"
 
 describe("Middleware ordering", () => {
   it.effect("non-wrapped then wrapped (page)", () =>
@@ -39,7 +37,7 @@ describe("Middleware ordering", () => {
       )
 
       const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-      const page = NextPage.make("Base", combined)
+      const page = Next.make("Base", combined)
         .middleware(Wrapped)
         .middleware(NonWrapped)
         .middleware(Wrapped)
@@ -86,7 +84,7 @@ describe("Middleware ordering", () => {
       )
 
       const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-      const layout = NextLayout.make("Base", combined)
+      const layout = Next.make("Base", combined)
         .middleware(Wrapped)
         .middleware(NonWrapped)
         .middleware(Wrapped)
@@ -183,7 +181,7 @@ describe("Middleware ordering", () => {
       )
 
       const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-      const component = NextServerComponent.make("Base", combined)
+      const component = Next.make("Base", combined)
         .middleware(Wrapped)
         .middleware(NonWrapped)
         .middleware(Wrapped)

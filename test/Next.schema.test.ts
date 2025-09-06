@@ -4,12 +4,12 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import * as Next from "../src/Next.js"
 import { decodeParams, decodeSearchParams } from "../src/Next.js"
-import * as NextPage from "../src/NextPage.js"
 
-describe("NextPage schema failures", () => {
+describe("Next schema failures", () => {
   class Dummy extends Context.Tag("Dummy")<Dummy, object>() {}
-  const app = NextPage.make("Base", Layer.succeed(Dummy, {}))
+  const app = Next.make("Base", Layer.succeed(Dummy, {}))
 
   it.effect("rejects on invalid params schema", () =>
     Effect.gen(function*() {

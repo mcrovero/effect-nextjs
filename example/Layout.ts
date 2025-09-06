@@ -2,7 +2,7 @@ import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { ParseError } from "effect/ParseResult"
-import * as NextLayout from "../src/NextLayout.js"
+import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 export class Theme extends Context.Tag("Theme")<Theme, { mode: "light" | "dark" }>() {}
@@ -36,7 +36,7 @@ const CatchAllLive = NextMiddleware.layer(
 
 const app = Layer.mergeAll(CatchAllLive, ThemeLive)
 
-const BaseLayout = NextLayout.make("Root", app)
+const BaseLayout = Next.make("Root", app)
 
 const layout = BaseLayout
   .middleware(ThemeMiddleware)

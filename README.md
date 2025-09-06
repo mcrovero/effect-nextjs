@@ -8,17 +8,15 @@ Wrapper around Next.js App Router to build pages, layouts, server components, an
 > [!WARNING]
 > This library is in early alpha and is not ready for production use.
 >
-> ### Breaking changes (v0.10.0)
+> ### Breaking changes (v0.11.0)
 >
-> This version changes the API to use the library, there is no longer a global Next.make(Layer) that exposes .page()/.layout()/.action()/.component() methods. You now need to use: NextPage.make("page_key", Layer), NextLayout.make("layout_key", Layer), etc.
-> The keys must be unique across the same type of components.
-> There are no more `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`.
-> You can now use the new helpers inside your handler:
+> - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, and server components. `NextPage.make`, `NextLayout.make`, and `NextServerComponent.make` have been removed.
+> - Actions: continue to use `NextAction.make(tag, layer)` for server actions. There is no `.build()` for actions; call `.run(...)` / `.runFn(...)` inside the exported async function.
+> - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. Use the helpers inside your handler:
+>   - `yield* Next.decodeParams(schema)(props)`
+>   - `yield* Next.decodeSearchParams(schema)(props)`
 >
-> - `yield* Next.decodeParams(schema)(props)`
-> - `yield* Next.decodeSearchParams(schema)(props)`
->
-> The actions API has changed, there is no more .build() look at the examples for the new API.
+> The `tag` passed to `Next.make` should be unique per handler to enable safe HMR during development.
 >
 > Read at the bottom of the README for more details on the decisions behind the new API.
 
@@ -46,7 +44,7 @@ pnpm add @mcrovero/effect-nextjs effect next
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { Layer, Schema } from "effect"
-import { Next, NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // A simple service
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -64,7 +62,7 @@ export const AuthLive = NextMiddleware.layer(AuthMiddleware, () => Effect.succee
 const AppLive = Layer.mergeAll(AuthLive)
 
 // Create a typed page handler
-export const page = NextPage.make("BasePage", AppLive)
+export const page = Next.make("BasePage", AppLive)
   .middleware(AuthMiddleware)
   .build(
     Effect.fn("HomePage")(function* (props: {
@@ -103,7 +101,7 @@ export default async function Page(props: {
 
 Notes
 
-- Use `NextLayout.make(tag, layer)`, `NextServerComponent.make(tag, layer)`, and `NextAction.make(tag, layer)` for layouts, server components, and server actions.
+- Use `Next.make(tag, layer)` for pages, layouts, and server components; and `NextAction.make(tag, layer)` for server actions.
 - Parse/validate values inside your handler using helpers: `Next.decodeParams(...)` and `Next.decodeSearchParams(...)`
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
@@ -116,7 +114,7 @@ Use `NextMiddleware.layer(tag, impl)` when your middleware needs other services.
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { Layer, Schema } from "effect"
-import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 // Dependencies
 export class Other extends Context.Tag("Other")<Other, { id: string; name: string }>() {}
@@ -141,7 +139,7 @@ const OtherLive = Layer.succeed(Other, { id: "999", name: "Jane" })
 const AppLive = Layer.mergeAll(OtherLive, AuthLive)
 
 // Use in a page
-const page = NextPage.make("Home", AppLive)
+const page = Next.make("Home", AppLive)
   .middleware(AuthMiddleware)
   .build(() =>
     Effect.gen(function* () {
@@ -159,7 +157,7 @@ Wrapped middlewares (`wrap: true`) receive a `next` Effect to run when they deci
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { Layer, Schema } from "effect"
-import { NextPage, NextMiddleware } from "@mcrovero/effect-nextjs"
+import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
@@ -179,7 +177,7 @@ const WrappedLive = NextMiddleware.layer(Wrapped, ({ next }) =>
 )
 
 const AppLive = Layer.mergeAll(WrappedLive)
-const page = NextPage.make("Home", AppLive)
+const page = Next.make("Home", AppLive)
   .middleware(Wrapped)
   .build(() => Effect.succeed("ok"))
 ```
@@ -190,10 +188,10 @@ Use `Schema` to validate/transform values explicitly inside your handler.
 
 ```ts
 import { Schema } from "effect"
-import { Next, NextPage, NextAction, NextServerComponent } from "@mcrovero/effect-nextjs"
+import { Next, NextAction } from "@mcrovero/effect-nextjs"
 
 // Params and searchParams (Page)
-const page = NextPage.make("Home", AppLive).build(
+const page = Next.make("Home", AppLive).build(
   Effect.fn("Home")(function* (props: {
     params: Promise<Record<string, string | undefined>>
     searchParams: Promise<Record<string, string | undefined>>
@@ -276,10 +274,10 @@ With Next.js 15.5, you can now use the globally available `PageProps` and `Layou
 
 ```ts
 import * as Effect from "effect/Effect"
-import { NextPage, NextLayout } from "@mcrovero/effect-nextjs"
+import { Next } from "@mcrovero/effect-nextjs"
 
 // Page with typed route parameters
-const blogPage = NextPage.make("BlogPage", AppLive).build(
+const blogPage = Next.make("BlogPage", AppLive).build(
   Effect.fn("BlogHandler")(function* (props: PageProps<"/blog/[slug]">) {
     const { slug } = yield* Effect.promise(() => props.params)
     return (
@@ -292,7 +290,7 @@ const blogPage = NextPage.make("BlogPage", AppLive).build(
 )
 
 // Layout with parallel routes support
-const dashboardLayout = NextLayout.make("DashboardLayout", AppLive).build(
+const dashboardLayout = Next.make("DashboardLayout", AppLive).build(
   Effect.fn("DashboardLayout")(function* (props: LayoutProps<"/dashboard">) {
     // Fully typed parallel route slots
     return (
