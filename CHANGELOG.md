@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.11.0
+
+### Minor Changes
+
+- [#34](https://github.com/mcrovero/effect-nextjs/pull/34) [`04322b2`](https://github.com/mcrovero/effect-nextjs/commit/04322b25390e1df73721b0de4e7a24fae5126b83) Thanks @mcrovero! - Moved to a single builder for Pages, Layouts and Server components
+
 ## 0.10.0
 
 ### Minor Changes
