@@ -1,21 +1,23 @@
-import { Cause, Exit } from "effect"
-import * as Context from "effect/Context"
+/**
+ * @since 0.5.0
+ */
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
-import * as Effect_ from "effect/Effect"
-import type * as ManagedRuntime from "effect/ManagedRuntime"
-import type { ParseError } from "effect/ParseResult"
+import type * as Layer from "effect/Layer"
+import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
-import * as Schema from "effect/Schema"
-import { createMiddlewareChain } from "./internal/middleware-chain.js"
+import { internalBuild, NextActionSymbolKey } from "./internal/next-action.js"
+import { setRuntime } from "./internal/runtime-registry.js"
+import type { AnySchema, CatchesFromMiddleware, WrappedReturns } from "./internal/shared.js"
+import { captureDefinitionSite } from "./internal/stacktrace.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
  * @since 0.5.0
  * @category type ids
  */
-export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Action")
+export const TypeId: unique symbol = Symbol.for(NextActionSymbolKey)
 
 /**
  * @since 0.5.0
@@ -27,23 +29,34 @@ export type TypeId = typeof TypeId
  * @since 0.5.0
  * @category models
  */
+export interface Any extends Pipeable {
+  readonly [TypeId]: TypeId
+  readonly _tag: string
+  readonly key: string
+}
+
+/**
+ * @since 0.5.0
+ * @category models
+ */
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
   readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
-  readonly inputSchema?: Schema.Schema.All
 }
 
-type RuntimeSuccess<R extends ManagedRuntime.ManagedRuntime<any, any>> = R extends
-  ManagedRuntime.ManagedRuntime<infer ROut, any> ? ROut : never
+type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
+/**
+ * @since 0.5.0
+ * @category models
+ */
 export interface NextAction<
   in out Tag extends string,
-  in out Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
-  out Middleware extends NextMiddleware.TagClassAny = never,
-  in InputA = undefined
+  out L extends Layer.Layer<any, any, any>,
+  out Middleware extends NextMiddleware.TagClassAny = never
 > extends Pipeable {
   new(_: never): object
 
@@ -51,34 +64,49 @@ export interface NextAction<
   readonly _tag: Tag
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly runtime: Runtime
-  readonly inputSchema?: Schema.Schema.All
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
+  readonly inputSchema?: AnySchema
 
   middleware<M extends NextMiddleware.TagClassAny>(
-    middleware: Context_.Tag.Identifier<M> extends RuntimeSuccess<Runtime> ? M : never
-  ): NextAction<Tag, Runtime, Middleware | M, InputA>
+    middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
+  ): NextAction<Tag, L, Middleware | M>
 
-  setInputSchema<S extends Schema.Schema.All>(schema: S): NextAction<Tag, Runtime, Middleware, S>
-
-  build<
-    E extends CatchesFromMiddleware<Middleware>,
-    H extends BuildHandlerWithError<NextAction<Tag, Runtime, Middleware, InputA>, E>
+  /**
+   * Build an action handler without tracing.
+   *
+   * This variant does not create a tracing span nor capture call/definition
+   * sites. If you want tracing behavior similar to `Effect.fn` (named span
+   * with captured call/definition sites), use {@link buildFn} instead.
+   */
+  run<
+    O
   >(
-    handler: H
-  ): (
-    input: Input<NextAction<Tag, Runtime, Middleware, InputA>>
-  ) => Promise<(ReturnType<H> extends Promise<Effect<infer _A, any, any>> ? _A | WrappedReturns<Middleware> : never)>
+    handler: BuildHandler<NextAction<Tag, L, Middleware>, O>
+  ): BuildHandler<NextAction<Tag, L, Middleware>, O> extends Effect<infer _A, any, any> ?
+    Promise<_A | WrappedReturns<Middleware>> :
+    never
+
+  /**
+   * Build a traced action handler (mimics `Effect.fn`).
+   *
+   * This variant creates a named tracing span and captures both the
+   * definition site and the call site, similar to `Effect.fn`.
+   * The provided `spanName` will be used to label the span.
+   */
+  runFn<
+    O
+  >(
+    spanName: string,
+    handler: BuildHandler<NextAction<Tag, L, Middleware>, O>
+  ): BuildHandler<NextAction<Tag, L, Middleware>, O> extends Effect<infer _A, any, any> ?
+    Promise<_A | WrappedReturns<Middleware>> :
+    never
 }
 
-export interface Any extends Pipeable {
-  readonly [TypeId]: TypeId
-  readonly _tag: string
-  readonly key: string
-  readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAny>
-  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
-  readonly inputSchema?: Schema.Schema.All
-}
-
+/**
+ * @since 0.5.0
+ * @category models
+ */
 const Proto = {
   [TypeId]: TypeId,
   pipe() {
@@ -88,136 +116,57 @@ const Proto = {
     return makeProto({
       _tag: this._tag,
       runtime: this.runtime,
-      middlewares: [...this.middlewares, middleware],
-      ...(this.inputSchema !== undefined ? { inputSchema: this.inputSchema } as const : {})
+      middlewares: [...this.middlewares, middleware]
     })
   },
-  setInputSchema(this: AnyWithProps, schema: Schema.Schema.All) {
-    const options = {
-      _tag: this._tag,
-      runtime: this.runtime,
-      middlewares: this.middlewares,
-      ...(schema !== undefined ? { inputSchema: schema } as const : {})
-    }
-    return makeProto(options)
+
+  /**
+   * Build an action handler without tracing.
+   *
+   * This does not create a tracing span nor capture call/definition sites.
+   * Use {@link buildFn} for `Effect.fn`-like tracing.
+   */
+  run<
+    O
+  >(
+    this: AnyWithProps,
+    effect: Effect<O, any, any>
+  ) {
+    return internalBuild(this, effect, { traced: false })
   },
 
-  build(
+  /**
+   * Build a traced action handler (mimics `Effect.fn`).
+   *
+   * Creates a named tracing span and captures call/definition sites.
+   * The `spanName` labels the span for observability.
+   */
+  runFn<
+    O
+  >(
     this: AnyWithProps,
-    handler: (ctx: any) => Promise<Effect<any, any, any>>
+    spanName: string,
+    effect: Effect<O, any, any>
   ) {
-    const middlewares = this.middlewares
-    const runtime = this.runtime
-    const inputSchema = this.inputSchema
-    // Capture definition stack for tracing (definition site)
-    const defLimit = (Error as any).stackTraceLimit
-    ;(Error as any).stackTraceLimit = 2
-    const errorDef = new Error()
-    ;(Error as any).stackTraceLimit = defLimit
-    const spanName = this._tag
-    const spanAttributes = {
-      attributes: {
-        library: "@mcrovero/effect-nextjs",
-        component: "NextAction",
-        tag: this._tag
-      }
-    } as const
-    return async (inputArg: unknown) => {
-      // Capture call stack for tracing (call site)
-      const callLimit = (Error as any).stackTraceLimit
-      ;(Error as any).stackTraceLimit = 2
-      const errorCall = new Error()
-      ;(Error as any).stackTraceLimit = callLimit
-      const program = Effect_.gen(function*() {
-        const context = yield* Effect_.context<never>()
-        const rawInput = inputArg !== undefined ? inputArg : undefined
-        const input = inputSchema
-          ? Schema.decodeUnknown(inputSchema as any)(rawInput)
-          : rawInput
-        const payload = { input }
-        let handlerEffect = yield* Effect_.promise(() => handler(payload as any))
-        if (middlewares.length > 0) {
-          const options = { callerKind: "action" as const, input: (payload as any).input }
-          const tags = middlewares as ReadonlyArray<any>
-          handlerEffect = createMiddlewareChain(
-            tags,
-            (tag) => Context.unsafeGet(context, tag) as any,
-            handlerEffect,
-            spanName,
-            spanAttributes.attributes as any,
-            options
-          )
-        }
-        return yield* handlerEffect
-      })
-
-      // Create span and attach combined stacktrace (definition + call sites)
-      let cache: false | string = false
-      const captureStackTrace = () => {
-        if (cache !== false) {
-          return cache
-        }
-        if (errorCall.stack) {
-          const stackDef = errorDef.stack!.trim().split("\n")
-          const stackCall = errorCall.stack.trim().split("\n")
-          let endStackDef = stackDef.slice(2).join("\n").trim()
-          if (!endStackDef.includes(`(`)) {
-            endStackDef = endStackDef.replace(/at (.*)/, "at ($1)")
-          }
-          let endStackCall = stackCall.slice(2).join("\n").trim()
-          if (!endStackCall.includes(`(`)) {
-            endStackCall = endStackCall.replace(/at (.*)/, "at ($1)")
-          }
-          cache = `${endStackDef}\n${endStackCall}`
-          return cache
-        }
-      }
-      const traced = Effect_.withSpan(program as Effect<any, any, any>, spanName, {
-        captureStackTrace,
-        attributes: spanAttributes
-      })
-
-      /**
-       * Workaround to handle redirect errors
-       */
-      return runtime.runPromiseExit(traced as Effect<any, any, never>).then((result) => {
-        if (Exit.isFailure(result)) {
-          const mappedError = Cause.match<any, any>(result.cause, {
-            onEmpty: () => new Error("empty"),
-            onFail: (error) => error,
-            onDie: (defect) => defect,
-            onInterrupt: (fiberId) => new Error(`Interrupted`, { cause: fiberId }),
-            onSequential: (left, right) => new Error(`Sequential (left: ${left}) (right: ${right})`),
-            onParallel: (left, right) => new Error(`Parallel (left: ${left}) (right: ${right})`)
-          })
-
-          // Replace the stack with the effect stacktrace
-          const effectPretty = Cause.pretty(result.cause as any)
-          if (effectPretty && typeof effectPretty === "string") {
-            mappedError.stack = effectPretty
-          }
-          throw mappedError
-        }
-        return result.value
-      })
-    }
+    const errorDef = captureDefinitionSite()
+    return internalBuild(this, effect, { traced: true, spanName, errorDef })
   }
 }
 
 const makeProto = <
   const Tag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>,
+  const L extends Layer.Layer<any, any, any>,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly runtime: Runtime
+  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly inputSchema?: Schema.Schema.All
-}): NextAction<Tag, Runtime, Middleware> => {
+  readonly inputSchema?: AnySchema
+}): NextAction<Tag, L, Middleware> => {
   function NextAction() {}
   Object.setPrototypeOf(NextAction, Proto)
   Object.assign(NextAction, options)
-  NextAction.key = `@mcrovero/effect-nextjs/NextAction/${options._tag}`
+  NextAction.key = `${NextActionSymbolKey}/${options._tag}`
   return NextAction as any
 }
 
@@ -227,52 +176,29 @@ const makeProto = <
  */
 export const make = <
   const Tag extends string,
-  const Runtime extends ManagedRuntime.ManagedRuntime<any, any>
->(
-  tag: Tag,
-  runtime: Runtime
-): NextAction<Tag, Runtime> => {
+  const L extends Layer.Layer<any, any, never>
+>(tag: Tag, layer: L): NextAction<Tag, L> => {
+  const runtime = ManagedRuntime.make(layer)
+
+  // Register the runtime in the global registry for development mode (HMR support)
+  setRuntime(`${NextActionSymbolKey}/${tag}`, runtime)
+
   return makeProto({
     _tag: tag,
     runtime,
     middlewares: [] as Array<never>
-  }) as any
+  })
 }
 
-/**
- * @since 0.5.0
- * @category models
- */
 type ExtractProvides<R extends Any> = R extends NextAction<
   infer _Tag,
-  infer _Runtime,
-  infer _Middleware,
-  infer _InputA
-> ? RuntimeSuccess<_Runtime> | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
+  infer _Layer,
+  infer _Middleware
+> ?
+    | LayerSuccess<_Layer>
+    | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
-type Input<P extends Any> = P extends NextAction<infer _Tag, infer _Runtime, infer _Middleware, infer InputA> ?
-  InputA extends Schema.Schema<infer _type, infer encoded, infer _c> ? encoded : unknown
-  : never
-
-type HandlerInputEffect<P extends Any> = P extends
-  NextAction<infer _Tag, infer _Runtime, infer _Middleware, infer InputA> ?
-  (InputA extends Schema.Schema<infer type, infer _encoded, infer _c> ? Effect<type, ParseError, never> : unknown)
-  : never
-
-// Allowed errors are from wrapped middlewares' catches schema (otherwise never)
-type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A
-  : never
-
-// Helper to constrain an action handler's error to an allowed schema-derived type
-type BuildHandlerWithError<P extends Any, E> = (
-  request: {
-    readonly input: HandlerInputEffect<P>
-  }
-) => Promise<Effect<any, E, ExtractProvides<P>>>
-
-// Collect the union of "returns" value types from wrapped middlewares' Schema
-type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
-type WrappedReturns<M> = M extends { readonly wrap: true }
-  ? InferSchemaOutput<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
-  : never
+type BuildHandler<P extends Any, O> = P extends NextAction<infer _Tag, infer _Layer, infer _Middleware> ?
+  Effect<O, CatchesFromMiddleware<_Middleware>, ExtractProvides<P>> :
+  never

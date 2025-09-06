@@ -2,8 +2,8 @@ import { Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextPage from "../src/NextPage.js"
 
 // A simple context tag for the current user
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
@@ -45,16 +45,10 @@ const _NotWrappedLive = Layer.succeed(
 
 const ProdLive = Layer.mergeAll(_WrappedLive, _NotWrappedLive)
 
-const _page = Next.make(ProdLive).page("HomePage")
-  .setParamsSchema(Schema.Struct({
-    id: Schema.String
-  }))
-  // .setSearchParamsSchema(Schema.Struct({
-  //   id: Schema.String
-  // }))
+const _page = NextPage.make("Base", ProdLive)
   .middleware(WrappedMiddleware)
   .middleware(NotWrappedMiddleware)
-  .build(({ params }) =>
+  .build(({ params }: { params: Promise<{ id: string }> }) =>
     Effect.gen(function*() {
       const user = yield* CurrentUser
       yield* Effect.fail("error")
@@ -62,4 +56,4 @@ const _page = Next.make(ProdLive).page("HomePage")
     }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
   )
 
-console.log(await _page({ params: Promise.resolve({ id: "abc" }), searchParams: Promise.resolve({}) }))
+console.log(await _page({ params: Promise.resolve({ id: "abc" }) }))

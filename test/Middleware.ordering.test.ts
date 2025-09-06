@@ -1,192 +1,204 @@
+import { describe, it } from "@effect/vitest"
+import { deepStrictEqual, strictEqual } from "@effect/vitest/utils"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { describe, expect, it } from "vitest"
-import * as Next from "../src/Next.js"
+import * as NextAction from "../src/NextAction.js"
+import * as NextLayout from "../src/NextLayout.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextPage from "../src/NextPage.js"
+import * as NextServerComponent from "../src/NextServerComponent.js"
 
 describe("Middleware ordering", () => {
-  it("non-wrapped then wrapped (page)", async () => {
-    const order: Array<string> = []
+  it.effect("non-wrapped then wrapped (page)", () =>
+    Effect.gen(function*() {
+      const order: Array<string> = []
 
-    class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
-    class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
+      class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
+      class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
 
-    // Use Layer.succeed with TagClass.of to avoid type issues for tests
-    const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
-      Wrapped,
-      Wrapped.of(({ next }) =>
-        Effect.gen(function*() {
-          yield* Effect.sync(() => order.push("wrap:start"))
-          const result = yield* next
-          yield* Effect.sync(() => order.push("wrap:end"))
-          return result
-        })
+      // Use Layer.succeed with TagClass.of to avoid type issues for tests
+      const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
+        Wrapped,
+        Wrapped.of(({ next }) =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("wrap:start"))
+            const result = yield* next
+            yield* Effect.sync(() => order.push("wrap:end"))
+            return result
+          })
+        )
       )
-    )
 
-    const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
-      NonWrapped,
-      NonWrapped.of(() =>
-        Effect.sync(() => {
-          order.push("nonwrap")
-        })
+      const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
+        NonWrapped,
+        NonWrapped.of(() =>
+          Effect.sync(() => {
+            order.push("nonwrap")
+          })
+        )
       )
-    )
 
-    const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-    const page = Next.make(combined)
-      .page("OrderTestA")
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
+      const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
+      const page = NextPage.make("Base", combined)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
 
-    const result = await page.build(() =>
-      Effect.gen(function*() {
-        yield* Effect.sync(() => order.push("handler"))
-        return "ok"
-      })
-    )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
-
-    expect(result).toBe("ok")
-    expect(order).toEqual(["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
-  })
-  it("non-wrapped then wrapped (layout)", async () => {
-    const order: Array<string> = []
-
-    class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
-    class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
-
-    const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
-      Wrapped,
-      Wrapped.of(({ next }) =>
-        Effect.gen(function*() {
-          yield* Effect.sync(() => order.push("wrap:start"))
-          const result = yield* next
-          yield* Effect.sync(() => order.push("wrap:end"))
-          return result
-        })
+      const result = yield* Effect.promise(() =>
+        page.build(() =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("handler"))
+            return "ok"
+          })
+        )({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })
       )
-    )
 
-    const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
-      NonWrapped,
-      NonWrapped.of(() =>
-        Effect.sync(() => {
-          order.push("nonwrap")
-        })
+      strictEqual(result, "ok")
+      deepStrictEqual(order, ["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
+    }))
+  it.effect("non-wrapped then wrapped (layout)", () =>
+    Effect.gen(function*() {
+      const order: Array<string> = []
+
+      class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
+      class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
+
+      const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
+        Wrapped,
+        Wrapped.of(({ next }) =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("wrap:start"))
+            const result = yield* next
+            yield* Effect.sync(() => order.push("wrap:end"))
+            return result
+          })
+        )
       )
-    )
 
-    const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-    const layout = Next.make(combined)
-      .layout("OrderTestLayout")
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
-
-    const result = await layout.build(() =>
-      Effect.gen(function*() {
-        yield* Effect.sync(() => order.push("handler"))
-        return "ok"
-      })
-    )({ params: Promise.resolve({}), children: null })
-
-    expect(result).toBe("ok")
-    expect(order).toEqual(["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
-  })
-
-  it("non-wrapped then wrapped (action)", async () => {
-    const order: Array<string> = []
-
-    class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
-    class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
-
-    const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
-      Wrapped,
-      Wrapped.of(({ next }) =>
-        Effect.gen(function*() {
-          yield* Effect.sync(() => order.push("wrap:start"))
-          const result = yield* next
-          yield* Effect.sync(() => order.push("wrap:end"))
-          return result
-        })
+      const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
+        NonWrapped,
+        NonWrapped.of(() =>
+          Effect.sync(() => {
+            order.push("nonwrap")
+          })
+        )
       )
-    )
 
-    const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
-      NonWrapped,
-      NonWrapped.of(() =>
-        Effect.gen(function*() {
-          yield* Effect.sync(() => order.push("nonwrap"))
-          return { _: Symbol("ok") } as any
-        })
+      const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
+      const layout = NextLayout.make("Base", combined)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
+
+      const result = yield* Effect.promise(() =>
+        layout.build(() =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("handler"))
+            return "ok"
+          })
+        )({ params: Promise.resolve({}), children: null })
       )
-    )
 
-    const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-    const action = Next.make(combined)
-      .action("OrderTestAction")
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
+      strictEqual(result, "ok")
+      deepStrictEqual(order, ["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
+    }))
 
-    const result = await action.build(async () =>
-      Effect.gen(function*() {
-        yield* Effect.sync(() => order.push("handler"))
-        return "ok"
-      })
-    )({})
+  it.effect("non-wrapped then wrapped (action)", () =>
+    Effect.gen(function*() {
+      const order: Array<string> = []
 
-    expect(result).toBe("ok")
-    expect(order).toEqual(["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
-  })
+      class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
+      class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
 
-  it("non-wrapped then wrapped (server component)", async () => {
-    const order: Array<string> = []
-
-    class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
-    class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
-
-    const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
-      Wrapped,
-      Wrapped.of(({ next }) =>
-        Effect.gen(function*() {
-          yield* Effect.sync(() => order.push("wrap:start"))
-          const result = yield* next
-          yield* Effect.sync(() => order.push("wrap:end"))
-          return result
-        })
+      const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
+        Wrapped,
+        Wrapped.of(({ next }) =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("wrap:start"))
+            const result = yield* next
+            yield* Effect.sync(() => order.push("wrap:end"))
+            return result
+          })
+        )
       )
-    )
 
-    const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
-      NonWrapped,
-      NonWrapped.of(() =>
-        Effect.sync(() => {
-          order.push("nonwrap")
-        })
+      const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
+        NonWrapped,
+        NonWrapped.of(() =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("nonwrap"))
+            return { _: Symbol("ok") } as any
+          })
+        )
       )
-    )
 
-    const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-    const component = Next.make(combined)
-      .component("OrderTestComponent")
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
-      .middleware(Wrapped)
-      .middleware(NonWrapped)
+      const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
+      const action = NextAction.make("Base", combined)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
 
-    const result = await component.build(() =>
-      Effect.gen(function*() {
-        yield* Effect.sync(() => order.push("handler"))
-        return "ok"
-      })
-    )()
+      const result = yield* Effect.promise(() =>
+        action.run(
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("handler"))
+            return "ok"
+          })
+        )
+      )
 
-    expect(result).toBe("ok")
-    expect(order).toEqual(["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
-  })
+      strictEqual(result, "ok")
+      deepStrictEqual(order, ["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
+    }))
+
+  it.effect("non-wrapped then wrapped (server component)", () =>
+    Effect.gen(function*() {
+      const order: Array<string> = []
+
+      class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", { wrap: true }) {}
+      class NonWrapped extends NextMiddleware.Tag<NonWrapped>()("NonWrapped") {}
+
+      const WrappedLive: Layer.Layer<Wrapped> = Layer.succeed(
+        Wrapped,
+        Wrapped.of(({ next }) =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("wrap:start"))
+            const result = yield* next
+            yield* Effect.sync(() => order.push("wrap:end"))
+            return result
+          })
+        )
+      )
+
+      const NonWrappedLive: Layer.Layer<NonWrapped> = Layer.succeed(
+        NonWrapped,
+        NonWrapped.of(() =>
+          Effect.sync(() => {
+            order.push("nonwrap")
+          })
+        )
+      )
+
+      const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
+      const component = NextServerComponent.make("Base", combined)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
+        .middleware(Wrapped)
+        .middleware(NonWrapped)
+
+      const result = yield* Effect.promise(() =>
+        component.build(() =>
+          Effect.gen(function*() {
+            yield* Effect.sync(() => order.push("handler"))
+            return "ok"
+          })
+        )({})
+      )
+
+      strictEqual(result, "ok")
+      deepStrictEqual(order, ["wrap:start", "nonwrap", "wrap:start", "nonwrap", "handler", "wrap:end", "wrap:end"])
+    }))
 })

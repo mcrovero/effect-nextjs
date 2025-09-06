@@ -1,8 +1,8 @@
 import { Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import * as NextServerComponent from "../src/NextServerComponent.js"
 
 export class ServerTime extends Context.Tag("ServerTime")<ServerTime, { now: number }>() {}
 
@@ -16,13 +16,22 @@ const TimeLive = Layer.succeed(
   TimeMiddleware.of(() => Effect.succeed({ now: Date.now() }))
 )
 
-export default Next.make(TimeLive)
-  .component("ServerInfo")
+export default NextServerComponent.make("Base", TimeLive)
   .middleware(TimeMiddleware)
   .build(({ time }: { time: { now: number } }) =>
     Effect.gen(function*() {
       const server = yield* ServerTime
 
       return { time: { ...time, now: server.now + 1000 } }
+    })
+  )
+
+export const component = NextServerComponent.make("Base", TimeLive)
+  .middleware(TimeMiddleware)
+  .build(() =>
+    Effect.gen(function*() {
+      const server = yield* ServerTime
+
+      return { time: { now: server.now + 1000 } }
     })
   )
