@@ -76,7 +76,7 @@ export interface NextAction<
    *
    * This variant does not create a tracing span nor capture call/definition
    * sites. If you want tracing behavior similar to `Effect.fn` (named span
-   * with captured call/definition sites), use {@link buildFn} instead.
+   * with captured call/definition sites), use {@link runFn} instead.
    */
   run<
     O
@@ -124,7 +124,7 @@ const Proto = {
    * Build an action handler without tracing.
    *
    * This does not create a tracing span nor capture call/definition sites.
-   * Use {@link buildFn} for `Effect.fn`-like tracing.
+   * Use {@link runFn} for `Effect.fn`-like tracing.
    */
   run<
     O

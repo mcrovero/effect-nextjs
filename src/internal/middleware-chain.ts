@@ -19,7 +19,6 @@ export type MiddlewareChainOptionsBase =
   }
   | {
     readonly callerKind: "action"
-    readonly input?: unknown
   }
   | {
     readonly callerKind: "component"

@@ -20,7 +20,7 @@ Wrapper around Next.js App Router to build pages, layouts, server components, an
 >
 > The actions API has changed, there is no more .build() look at the examples for the new API.
 >
-> Read at the bottom of the README for more details for the decisions behind the new API.
+> Read at the bottom of the README for more details on the decisions behind the new API.
 
 ### Why this library
 
@@ -92,7 +92,7 @@ import { page } from "@/lib/app" // wherever you defined it
 // Use it directly
 export default page
 
-// Or use it in a Next.js page
+// Or use it in a Next.js page (choose one default export)
 export default async function Page(props: {
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string>>
@@ -209,10 +209,10 @@ const page = NextPage.make("Home", AppLive).build(
 
 Next.js requires every exported server action to be an async function at the export site. Because of this, actions are handled slightly differently than pages, layouts and server components.
 
-Use `NextAction.make(...).run(...)` or `NextAction.make(...).runFn(...)` to produce an async function that you can export directly.
+Use `NextAction.make(...).run(...)` or `NextAction.make(...).runFn(...)` inside an async exported function. Both return a Promise of the result.
 
-- **run**: returns an async function, no tracing span.
-- **runFn**: returns an async function and also creates a named tracing span (similar to `Effect.fn`).
+- **run**: executes without creating a tracing span; returns a Promise.
+- **runFn**: executes with a named tracing span (similar to `Effect.fn`); returns a Promise.
 
 Basic example:
 
@@ -281,7 +281,7 @@ import { NextPage, NextLayout } from "@mcrovero/effect-nextjs"
 // Page with typed route parameters
 const blogPage = NextPage.make("BlogPage", AppLive).build(
   Effect.fn("BlogHandler")(function* (props: PageProps<"/blog/[slug]">) {
-    const { slug } = Effect.promise(() => props.params)
+    const { slug } = yield* Effect.promise(() => props.params)
     return (
       <article>
         <h1>Blog Post: {slug}</h1>
