@@ -1,5 +1,6 @@
 /**
  * @since 0.5.0
+ * @deprecated Use `Next.make(tag, layer).build(handler)` for server actions. This API will be removed in a future release.
  */
 import type * as Context_ from "effect/Context"
 import type { Effect } from "effect/Effect"
@@ -16,18 +17,21 @@ import type * as NextMiddleware from "./NextMiddleware.js"
 /**
  * @since 0.5.0
  * @category type ids
+ * @deprecated Use `Next.make(tag, layer).build(handler)` for server actions. This API will be removed in a future release.
  */
 export const TypeId: unique symbol = Symbol.for(NextActionSymbolKey)
 
 /**
  * @since 0.5.0
  * @category type ids
+ * @deprecated Use `Next.make(tag, layer).build(handler)` for server actions. This API will be removed in a future release.
  */
 export type TypeId = typeof TypeId
 
 /**
  * @since 0.5.0
  * @category models
+ * @deprecated Use `Next.make(tag, layer).build(handler)` for server actions. This API will be removed in a future release.
  */
 export interface Any extends Pipeable {
   readonly [TypeId]: TypeId
@@ -38,6 +42,7 @@ export interface Any extends Pipeable {
 /**
  * @since 0.5.0
  * @category models
+ * @deprecated Use `Next.make(tag, layer).build(handler)` for server actions. This API will be removed in a future release.
  */
 export interface AnyWithProps {
   readonly [TypeId]: TypeId
@@ -52,6 +57,7 @@ type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<
 /**
  * @since 0.5.0
  * @category models
+ * @deprecated Use `Next.make(tag, layer).build(handler)` for server actions. This API will be removed in a future release.
  */
 export interface NextAction<
   in out Tag extends string,
@@ -72,6 +78,7 @@ export interface NextAction<
   ): NextAction<Tag, L, Middleware | M>
 
   /**
+   * @deprecated Use `Next.make(tag, layer).build(handler)` and export an async function that calls the built handler.
    * Build an action handler without tracing.
    *
    * This variant does not create a tracing span nor capture call/definition
@@ -87,6 +94,7 @@ export interface NextAction<
     never
 
   /**
+   * @deprecated Use `Next.make(tag, layer).build(handler)` with `Effect.fn` for tracing.
    * Build a traced action handler (mimics `Effect.fn`).
    *
    * This variant creates a named tracing span and captures both the
@@ -121,6 +129,7 @@ const Proto = {
   },
 
   /**
+   * @deprecated Use `Next.make(tag, layer).build(handler)` and export an async function that calls the built handler.
    * Build an action handler without tracing.
    *
    * This does not create a tracing span nor capture call/definition sites.
@@ -136,6 +145,7 @@ const Proto = {
   },
 
   /**
+   * @deprecated Use `Next.make(tag, layer).build(handler)` with `Effect.fn` for tracing.
    * Build a traced action handler (mimics `Effect.fn`).
    *
    * Creates a named tracing span and captures call/definition sites.
@@ -173,6 +183,7 @@ const makeProto = <
 /**
  * @since 0.5.0
  * @category constructors
+ * @deprecated Use `Next.make(tag, layer)` and `.build(handler)` for server actions.
  */
 export const make = <
   const Tag extends string,
@@ -183,6 +194,11 @@ export const make = <
   // Register the runtime in the global registry for development mode (HMR support)
   setRuntime(`${NextActionSymbolKey}/${tag}`, runtime)
 
+  if (process.env.NODE_ENV !== "production") {
+    console.warn(
+      "[DEPRECATED] NextAction is deprecated and will be removed in a future release. Use Next.make(tag, layer).build(handler) for server actions."
+    )
+  }
   return makeProto({
     _tag: tag,
     runtime,
