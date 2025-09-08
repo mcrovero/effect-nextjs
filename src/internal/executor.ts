@@ -1,5 +1,4 @@
-import { Cause, Exit } from "effect"
-import type * as Effect from "effect/Effect"
+import { Cause, Effect, Exit } from "effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
 
 /**
@@ -7,10 +6,12 @@ import type * as ManagedRuntime from "effect/ManagedRuntime"
  * @category utils
  */
 export const executeWithRuntime = async <A>(
-  runtime: ManagedRuntime.ManagedRuntime<any, any>,
+  runtime: ManagedRuntime.ManagedRuntime<any, any> | undefined,
   effect: Effect.Effect<A, any, never>
 ): Promise<A> => {
-  const result = await runtime.runPromiseExit(effect as Effect.Effect<A, any, never>)
+  const result = runtime
+    ? await runtime.runPromiseExit(effect as Effect.Effect<A, any, never>)
+    : await Effect.runPromiseExit(effect as Effect.Effect<A, any, never>)
   if (Exit.isFailure(result)) {
     const mappedError = Cause.match<any, any>(result.cause, {
       onEmpty: () => new Error("empty"),

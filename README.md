@@ -64,53 +64,45 @@ export const AuthLive = NextMiddleware.layer(AuthMiddleware, () => Effect.succee
 const AppLive = Layer.mergeAll(AuthLive)
 
 // Create a typed page handler
-export const page = Next.make("BasePage", AppLive)
-  .middleware(AuthMiddleware)
-  .build(
-    Effect.fn("HomePage")(function* (props: {
-      params: Promise<Record<string, string | undefined>>
-      searchParams: Promise<Record<string, string | undefined>>
-    }) {
-      const { id } = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
-
-      const user = yield* CurrentUser
-      return (
-        <div>
-          Hello {user.name} (id: {id})
-        </div>
-      )
-    })
-  )
+export const Page = Next.make("BasePage", AppLive).middleware(AuthMiddleware)
 ```
 
 3. Use it in a Next.js App Router file
 
 ```ts
 // app/[id]/page.tsx
-import { page } from "@/lib/app" // wherever you defined it
+import { Page } from "@/lib/app" // wherever you defined it
 
-// Use it directly
-export default page
-
-// Or use it in a Next.js page (choose one default export)
-export default async function Page(props: {
-  params: Promise<{ id: string }>
-  searchParams: Promise<Record<string, string>>
+const HomePage = Effect.fn("HomePage")(function* (props: {
+  params: Promise<Record<string, string | undefined>>
+  searchParams: Promise<Record<string, string | undefined>>
 }) {
-  return await page({ params: props.params, searchParams: props.searchParams })
-}
+  const { id } = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+
+  const user = yield* CurrentUser
+  return (
+    <div>
+      Hello {user.name} (id: {id})
+    </div>
+  )
+})
+
+export default Page.build(HomePage)
+
+// Or add other middlewares
+export default Page.middleware(RandomMiddleware).build(HomePage)
 ```
 
 Notes
 
-- Use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions. `NextAction` is deprecated.
+- Use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions.
 - Parse/validate values inside your handler using helpers: `Next.decodeParams(...)` and `Next.decodeSearchParams(...)`
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
 ### Middlewares with dependencies
 
-Use `NextMiddleware.layer(tag, impl)` when your middleware needs other services.
+Use `NextMiddleware.layer(tag, impl)` to define a middleware with or without dependencies.
 
 ```ts
 import * as Context from "effect/Context"
@@ -179,9 +171,7 @@ const WrappedLive = NextMiddleware.layer(Wrapped, ({ next }) =>
 )
 
 const AppLive = Layer.mergeAll(WrappedLive)
-const page = Next.make("Home", AppLive)
-  .middleware(Wrapped)
-  .build(() => Effect.succeed("ok"))
+const Page = Next.make("Home", AppLive).middleware(Wrapped)
 ```
 
 ### Parsing params, searchParams
@@ -193,21 +183,21 @@ import { Schema } from "effect"
 import { Next } from "@mcrovero/effect-nextjs"
 
 // Params and searchParams (Page)
-const page = Next.make("Home", AppLive).build(
-  Effect.fn("Home")(function* (props: {
-    params: Promise<Record<string, string | undefined>>
-    searchParams: Promise<Record<string, string | undefined>>
-  }) {
-    const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
-    const searchParams = yield* Next.decodeSearchParams(Schema.Struct({ q: Schema.optional(Schema.String) }))(props)
-    return { params, searchParams }
-  })
-)
+const HomePage = Effect.fn("Home")(function* (props: {
+  params: Promise<Record<string, string | undefined>>
+  searchParams: Promise<Record<string, string | undefined>>
+}) {
+  const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+  const searchParams = yield* Next.decodeSearchParams(Schema.Struct({ q: Schema.optional(Schema.String) }))(props)
+  return { params, searchParams }
+})
+
+export default Next.make("Home", AppLive).build(HomePage)
 ```
 
 ### Routes (app/api)
 
-`Next.make(tag, layer).build(handler)` is generic and works for route handlers too. Define your `GET`, `POST`, etc. by exporting the built function. The handler receives the same arguments you would pass to a Next.js route (e.g. `request: Request`).
+`Next.make(tag, layer).build(handler)` is generic and works for route handlers too. Define your `GET`, `POST`, etc. by exporting the built function. The handler receives the same arguments you would pass to a Next.js route (e.g. `request: NextRequest`).
 
 ```ts
 // app/api/time/route.ts
@@ -216,71 +206,15 @@ import { Layer } from "effect"
 import * as Context from "effect/Context"
 import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
-export class ServerTime extends Context.Tag("ServerTime")<ServerTime, { now: number }>() {}
+const AppLive = Layer.mergeAll()
 
-export class TimeMiddleware extends NextMiddleware.Tag<TimeMiddleware>()("TimeMiddleware", {
-  provides: ServerTime
-}) {}
-
-const TimeLive = NextMiddleware.layer(TimeMiddleware, () => Effect.succeed({ now: Date.now() }))
-const AppLive = Layer.mergeAll(TimeLive)
-
-export const GET = Next.make("ServerTimeRoute", AppLive)
-  .middleware(TimeMiddleware)
-  .build((request: Request) =>
-    Effect.gen(function* () {
-      const server = yield* ServerTime
-      return { ok: true, now: server.now }
-    })
-  )
+const _GET = Effect.fn("ServerTimeRoute")(function* () {
+  const server = yield* ServerTime
+  return { ok: true, now: server.now }
+})
+export const GET = Next.make("ServerTimeRoute", AppLive).middleware(TimeMiddleware).build(_GET)
 
 // Similarly for POST/PUT/DELETE, export POST/PUT/DELETE with the same pattern.
-```
-
-### Split program from export (all handlers)
-
-Keeping the Effect program definition separate from the exported handler improves DX for every handler type (pages, layouts, server components, routes, and actions). Errors remain localized to the program definition, while the export site remains small and readable.
-
-Page example:
-
-```ts
-import * as Effect from "effect/Effect"
-import { Next } from "@mcrovero/effect-nextjs"
-
-const Page = Next.make("HomePage", AppLive)
-
-const _homeProgram = Effect.fn("HomePage")(function* (props: PageProps<"/">) {
-  // ... your logic
-  return <div>Home</div>
-})
-
-export default Page.build(_homeProgram)
-```
-
-Route example:
-
-```ts
-const Route = Next.make("TimeRoute", AppLive)
-
-const _get = Effect.fn("GET")((request: Request) =>
-  Effect.gen(function* () {
-    return new Response("ok")
-  })
-)
-
-export const GET = Route.build(_get)
-```
-
-Server component example:
-
-```ts
-const Component = Next.make("UserCard", AppLive)
-
-const _userCard = Effect.fn("UserCard")(function* () {
-  return <div>User</div>
-})
-
-export default Component.build(_userCard)
 ```
 
 ### Server actions

@@ -38,15 +38,16 @@ const app = Layer.mergeAll(CatchAllLive, ProvideUserLive)
 
 const BasePage = Next.make("Home", app)
 
-const page = BasePage
+// In page.tsx
+
+const HomePage = Effect.fn("HomePage")(function*(props: { params: Promise<Record<string, string | undefined>> }) {
+  const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+  return `Hello ${params.id}!`
+})
+
+export default BasePage
   .middleware(ProvideUser)
   .middleware(CatchAll)
   .build(
-    Effect.fn("HomePage")(function*(props: { params: Promise<Record<string, string | undefined>> }) {
-      const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
-      return `Hello ${params.id}!`
-    })
+    HomePage
   )
-
-const result = await page({ params: Promise.resolve({ id: "abc" }) })
-console.log(result)

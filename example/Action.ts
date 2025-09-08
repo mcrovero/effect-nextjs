@@ -2,7 +2,6 @@ import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { Next } from "src/index.js"
-import * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 // A simple context tag for the current user
@@ -23,49 +22,16 @@ const AuthLive = Layer.succeed(
   AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "other" }))
 )
 
-// Action with tracing span
-export const actionTraced = async (input: { test: string }) =>
-  NextAction.make("Base", AuthLive)
-    .middleware(AuthMiddleware)
-    .runFn(
-      "Action",
-      Effect.gen(function*() {
-        const user = yield* CurrentUser
-        return { user, parsed: input.test }
-      })
-    )
+// In action.ts
 
-// Action without tracing span
-export const actionUntraced = async (input: { test: string }) =>
-  NextAction.make("Base", AuthLive)
-    .middleware(AuthMiddleware)
-    .run(
-      Effect.gen(function*() {
-        const user = yield* CurrentUser
-        return { user, parsed: input.test }
-      })
-    )
-
-// Action traced with Effect.fn
-type Input = { test: string }
-
-export const actionFn = async (props: Input) =>
-  Next.make("Base", AuthLive)
-    .middleware(AuthMiddleware).build(
-      Effect.fn("Action")(function*(input: Input) {
-        const user = yield* CurrentUser
-        return { user, parsed: input.test }
-      })
-    )(props)
-
-// Or
-const effect = Effect.fn("Action")(function*(input: Input) {
+const Action = Effect.fn("Action")(function*(input: { test: string }) {
   const user = yield* CurrentUser
   return { user, parsed: input.test }
 })
 
-export const actionFn2 = async (props: Input) =>
+// The async here is important to satisfy Next.js's requirement for server actions
+export const action = async (props: { test: string }) =>
   Next.make("Base", AuthLive)
     .middleware(AuthMiddleware).build(
-      effect
+      Action
     )(props)

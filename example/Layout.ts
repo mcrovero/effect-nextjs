@@ -37,15 +37,17 @@ const CatchAllLive = NextMiddleware.layer(
 const app = Layer.mergeAll(CatchAllLive, ThemeLive)
 
 const BaseLayout = Next.make("Root", app)
-
-const layout = BaseLayout
   .middleware(ThemeMiddleware)
   .middleware(CatchAll)
-  .build(
-    Effect.fn("RootLayout")(function*({ children, params }) {
-      const theme = yield* Theme
-      return { theme, params, children }
-    })
-  )
 
-console.log(await layout({ children: "<div>Child</div>", params: Promise.resolve({ locale: "en" }) }))
+// In layout.tsx
+
+const RootLayout = Effect.fn("RootLayout")(function*({ children, params }) {
+  const theme = yield* Theme
+  return { theme, params, children }
+})
+
+export default BaseLayout
+  .build(
+    RootLayout
+  )
