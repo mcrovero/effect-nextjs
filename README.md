@@ -133,14 +133,11 @@ const OtherLive = Layer.succeed(Other, { id: "999", name: "Jane" })
 const AppLive = Layer.mergeAll(OtherLive, AuthLive)
 
 // Use in a page
-const page = Next.make("Home", AppLive)
-  .middleware(AuthMiddleware)
-  .build(() =>
-    Effect.gen(function* () {
-      const user = yield* CurrentUser
-      return user
-    })
-  )
+const _home = Effect.fn("Home")(function* () {
+  const user = yield* CurrentUser
+  return user
+})
+const page = Next.make("Home", AppLive).middleware(AuthMiddleware).build(_home)
 ```
 
 ### Wrapped middlewares
