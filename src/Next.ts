@@ -86,10 +86,10 @@ export interface AnyWithProps {
   readonly _tag: string
   readonly key: string
   readonly middlewares: ReadonlyArray<NextMiddleware.TagClassAnyWithProps>
-  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
+  readonly runtime?: ManagedRuntime.ManagedRuntime<any, any>
 }
 
-type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
+type LayerSuccess<L> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
 /**
  * @since 0.5.0
@@ -97,7 +97,7 @@ type LayerSuccess<L extends Layer.Layer<any, any, any>> = L extends Layer.Layer<
  */
 export interface Next<
   in out Tag extends string,
-  out L extends Layer.Layer<any, any, any>,
+  out L extends Layer.Layer<any, any, any> | undefined,
   out Middleware extends NextMiddleware.TagClassAny = never
 > extends Pipeable {
   new(_: never): object
@@ -106,7 +106,7 @@ export interface Next<
   readonly _tag: Tag
   readonly key: string
   readonly middlewares: ReadonlyArray<Middleware>
-  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
+  readonly runtime?: ManagedRuntime.ManagedRuntime<any, any>
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
 
@@ -138,11 +138,17 @@ const Proto = {
     return pipeArguments(this, arguments)
   },
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
+    if (this.runtime) {
+      return makeProto({
+        _tag: this._tag,
+        runtime: this.runtime,
+        middlewares: [...this.middlewares, middleware]
+      } as any)
+    }
     return makeProto({
       _tag: this._tag,
-      runtime: this.runtime,
       middlewares: [...this.middlewares, middleware]
-    })
+    } as any)
   },
 
   build<
@@ -178,20 +184,21 @@ const Proto = {
        * In development we use global registry to get the runtime
        * to support hot-reloading.
        */
-      const actualRuntime = getRuntime(`${NextSymbolKey}/${this._tag}`, runtime)
-
-      // Workaround to handle redirect errors
-      return executeWithRuntime(actualRuntime, program as Effect.Effect<any, any, never>)
+      if (runtime) {
+        const actualRuntime = getRuntime(`${NextSymbolKey}/${this._tag}`, runtime)
+        return executeWithRuntime(actualRuntime, program as Effect.Effect<any, any, never>)
+      }
+      return executeWithRuntime(undefined, program as Effect.Effect<any, any, never>)
     }
   }
 }
 const makeProto = <
   const Tag extends string,
-  const L extends Layer.Layer<any, any, any>,
+  const L extends Layer.Layer<any, any, any> | undefined,
   Middleware extends NextMiddleware.TagClassAny
 >(options: {
   readonly _tag: Tag
-  readonly runtime: ManagedRuntime.ManagedRuntime<any, any>
+  readonly runtime?: ManagedRuntime.ManagedRuntime<any, any>
   readonly middlewares: ReadonlyArray<Middleware>
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
@@ -207,18 +214,26 @@ const makeProto = <
  * @since 0.5.0
  * @category constructors
  */
-export const make = <
+export function make<const Tag extends string>(tag: Tag): Next<Tag, undefined>
+export function make<
   const Tag extends string,
   const L extends Layer.Layer<any, any, never>
->(tag: Tag, layer: L): Next<Tag, L> => {
-  const runtime = ManagedRuntime.make(layer)
-
-  // Register the runtime in the global registry for development mode (HMR support)
-  setRuntime(`${NextSymbolKey}/${tag}`, runtime)
-
+>(
+  tag: Tag,
+  layer: L
+): Next<Tag, L>
+export function make(tag: string, layer?: Layer.Layer<any, any, never>): Next<any, any> {
+  if (layer) {
+    const runtime = ManagedRuntime.make(layer)
+    setRuntime(`${NextSymbolKey}/${tag}`, runtime)
+    return makeProto({
+      _tag: tag as any,
+      runtime,
+      middlewares: [] as Array<never>
+    })
+  }
   return makeProto({
-    _tag: tag,
-    runtime,
+    _tag: tag as any,
     middlewares: [] as Array<never>
   })
 }

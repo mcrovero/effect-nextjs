@@ -45,15 +45,18 @@ const _NotWrappedLive = Layer.succeed(
 
 const ProdLive = Layer.mergeAll(_WrappedLive, _NotWrappedLive)
 
-const _page = Next.make("Base", ProdLive)
+// In page.tsx
+
+const Page = ({ params }: { params: Promise<{ id: string }> }) =>
+  Effect.gen(function*() {
+    const user = yield* CurrentUser
+    yield* Effect.fail("error")
+    return { user, params }
+  }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
+
+export default Next.make("Base", ProdLive)
   .middleware(WrappedMiddleware)
   .middleware(NotWrappedMiddleware)
-  .build(({ params }: { params: Promise<{ id: string }> }) =>
-    Effect.gen(function*() {
-      const user = yield* CurrentUser
-      yield* Effect.fail("error")
-      return { user, params }
-    }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
+  .build(
+    Page
   )
-
-console.log(await _page({ params: Promise.resolve({ id: "abc" }) }))

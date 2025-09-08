@@ -16,12 +16,13 @@ const TimeLive = Layer.succeed(
   TimeMiddleware.of(() => Effect.succeed({ now: Date.now() }))
 )
 
+// In route.ts
+
+const _GET = Effect.fn("ServerTimeRoute")(function*() {
+  const server = yield* ServerTime
+  return { server }
+})
+
 export const GET = Next.make("Base", TimeLive)
   .middleware(TimeMiddleware)
-  .build((request: any) =>
-    Effect.gen(function*() {
-      const server = yield* ServerTime
-
-      return { request, server }
-    })
-  )
+  .build(_GET)

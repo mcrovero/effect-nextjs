@@ -16,22 +16,13 @@ const TimeLive = Layer.succeed(
   TimeMiddleware.of(() => Effect.succeed({ now: Date.now() }))
 )
 
+// In serverComponent.tsx
+
+const _ServerComponent = Effect.fn("ServerComponent")(function*({ time }: { time: { now: number } }) {
+  const server = yield* ServerTime
+  return { time: { ...time, now: server.now + 1000 } }
+})
+
 export default Next.make("Base", TimeLive)
   .middleware(TimeMiddleware)
-  .build(({ time }: { time: { now: number } }) =>
-    Effect.gen(function*() {
-      const server = yield* ServerTime
-
-      return { time: { ...time, now: server.now + 1000 } }
-    })
-  )
-
-export const component = Next.make("Base", TimeLive)
-  .middleware(TimeMiddleware)
-  .build(() =>
-    Effect.gen(function*() {
-      const server = yield* ServerTime
-
-      return { time: { now: server.now + 1000 } }
-    })
-  )
+  .build(_ServerComponent)
