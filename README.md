@@ -253,47 +253,6 @@ export const updateName = async (input: { name: string }) => UpdateNameAction.bu
 
 This split keeps your handler body clean and debuggable while ensuring the export remains an async function as required by Next.js.
 
-### One Next instance or many? (Layers strategies)
-
-You can centralize configuration or customize per handler:
-
-- **Single shared setup (factory pattern)**: share one Layer across the app and create per-handler builders with unique tags.
-
-```ts
-const AppLive = Layer.mergeAll(AuthLive, DbLive)
-const makeApp = (tag: string) => Next.make(tag, AppLive)
-
-export default makeApp("HomePage").build(_homeProgram)
-export const GET = makeApp("TimeRoute").build(_get)
-```
-
-- **Multiple Next instances with different Layers**: tailor dependencies per handler/component.
-
-```ts
-const Public = Next.make("PublicHome", PublicLive)
-const Admin = Next.make("AdminPage", Layer.mergeAll(PublicLive, AdminLive))
-
-export default Public.build(_publicHome)
-export const GET = Admin.build(_adminGet)
-```
-
-- **Mix and match**: start from a base Layer and extend per handler.
-
-```ts
-const BaseLive = Layer.mergeAll(CoreLive)
-const ProfilePage = Next.make("ProfilePage", Layer.mergeAll(BaseLive, ProfileLive))
-const _profile = Effect.fn("Profile")(function* () {
-  /* ... */ return <div />
-})
-export default ProfilePage.build(_profile)
-```
-
-Notes:
-
-- Use a **unique tag per handler** to enable safe HMR during development.
-- Ensure each handler's Layer satisfies all middleware/service requirements used by its program.
-- Middlewares can be reused across different `Next.make(...)` instances.
-
 ### Next.js Route Props Helpers Integration
 
 With Next.js 15.5, you can now use the globally available `PageProps` and `LayoutProps` types for fully typed route parameters without manual definitions. You can use them with this library as follows:
