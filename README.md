@@ -26,7 +26,7 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 - **Dev HMR safety**: In development, previous `ManagedRuntime`s are disposed on hot reload to prevent resource leaks.
 - **Per-handler runtime**: Each page/layout/action/component runs on a `ManagedRuntime` built from your `Layer`.
 - **Works with caching**: Pairs well with `@mcrovero/effect-react-cache` for cross-route Effect caching across pages, layouts, components, and routes.
-- **Enriched error stacktraces**: Errors from `Effect` programs are rethrown with a readable stack using `Cause.pretty` in `src/internal/executor.ts`, making debugging much clearer in Next.js.
+- **Enriched error stacktraces**: Errors from `Effect` programs are rethrown with a readable stack using `Cause.pretty`, making debugging much clearer in Next.js.
 
 ### Getting Started
 
