@@ -73,7 +73,7 @@ const HomePage = Effect.fn("HomePage")(function* (props: {
   params: Promise<Record<string, string | undefined>>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
-  const { id } = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+  const { id } = yield* Effect.promise(() => props)
 
   const user = yield* CurrentUser
   return (
