@@ -24,7 +24,6 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 - **Composable middlewares**: Add middlewares as `Context.Tag`s. Support for both provide-style and `wrap: true` middlewares, with typed `failure`/`catches`/`returns`.
 - **Next.js control flow preserved**: `redirect`, `notFound` etc.. work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
 - **Dev HMR safety**: In development, previous `ManagedRuntime`s are disposed on hot reload to prevent resource leaks.
-- **Typed decoding helpers**: Opt-in helpers to parse `params` and `searchParams` using `Schema`.
 - **Per-handler runtime**: Each page/layout/action/component runs on a `ManagedRuntime` built from your `Layer`.
 - **Works with caching**: Pairs well with `@mcrovero/effect-react-cache` for cross-route Effect caching across pages, layouts, components, and routes.
 - **Enriched error stacktraces**: Errors from `Effect` programs are rethrown with a readable stack using `Cause.pretty` in `src/internal/executor.ts`, making debugging much clearer in Next.js.
