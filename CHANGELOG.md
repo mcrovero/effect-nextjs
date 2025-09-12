@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.20.0
+
+### Minor Changes
+
+- [#38](https://github.com/mcrovero/effect-nextjs/pull/38) [`b1860e7`](https://github.com/mcrovero/effect-nextjs/commit/b1860e77c6d849a6cd5f4729d9dc028864094835) Thanks @mcrovero! - ! Breaking: Deprecating NextAction and removed utils to decode params and search params
+
 ## 0.12.0
 
 ### Minor Changes
