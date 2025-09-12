@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import { ParseError } from "effect/ParseResult"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
+import { decodeParamsUnknown } from "./utils/params.js"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
@@ -41,7 +42,7 @@ const BasePage = Next.make("Home", app)
 // In page.tsx
 
 const HomePage = Effect.fn("HomePage")(function*(props: { params: Promise<Record<string, string | undefined>> }) {
-  const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
+  const params = yield* decodeParamsUnknown(Schema.Struct({ id: Schema.String }))(props.params)
   return `Hello ${params.id}!`
 })
 
