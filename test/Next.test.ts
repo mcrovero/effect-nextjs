@@ -5,7 +5,6 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Next from "../src/Next.js"
-import { decodeParams, decodeSearchParams } from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("Next", () => {
@@ -30,7 +29,7 @@ describe("Next", () => {
     OtherMiddleware.of(() => Effect.succeed({ id: "456", name: "Jane Doe" }))
   )
 
-  it.effect("runs handler with provided services and decoded params", () =>
+  it.effect("runs handler with provided services and params", () =>
     Effect.gen(function*() {
       const combined = Layer.mergeAll(AuthLive, OtherLive)
       const page = Next.make("Base", combined)
@@ -44,9 +43,9 @@ describe("Next", () => {
           Effect.gen(function*() {
             const user = yield* CurrentUser
             const other = yield* Other
-            const decodedParams = yield* decodeParams(Schema.Struct({ id: Schema.String }))({ params })
-            const decodedSearchParams = yield* decodeSearchParams(Schema.Struct({ q: Schema.String }))({ searchParams })
-            return { user, other, params: decodedParams, searchParams: decodedSearchParams }
+            const awaitedParams = yield* Effect.promise(() => params)
+            const awaitedSearchParams = yield* Effect.promise(() => searchParams)
+            return { user, other, params: awaitedParams, searchParams: awaitedSearchParams }
           }).pipe(Effect.catchAll(() => Effect.succeed({ error: "error" })))
         )({ params: Promise.resolve({ id: "p1" }), searchParams: Promise.resolve({ q: "hello" }) })
       )

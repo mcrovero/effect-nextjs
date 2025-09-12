@@ -8,16 +8,13 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 > [!WARNING]
 > This library is in early alpha and is not ready for production use.
 >
-> ### Breaking changes (v0.11.0)
+> ### Breaking changes (v0.20.0)
 >
 > - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions.
 > - Removed `Next.make().actions()/.layout()/.component()`, `NextPage`, `NextLayout`, and `NextServerComponent`.
-> - Server actions: use `Next.make(tag, layer).build(handler)` and export an async function that calls the built handler. `NextAction` is deprecated and will be removed in a future release.
-> - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. Use the helpers inside your handler:
->   - `yield* Next.decodeParams(schema)(props)`
->   - `yield* Next.decodeSearchParams(schema)(props)`
->
-> The `tag` passed to `Next.make` should be unique per handler to enable safe HMR during development.
+> - Server actions: use `Next.make(tag, layer).build(handler)` no more NextAction.
+> - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. See `example/utils/params.ts` for example helper utilities to parse `params` and `searchParams` with `Schema`.
+>   The `tag` passed to `Next.make` should be unique per handler to enable safe HMR during development.
 >
 > Read at the bottom of the README for more details on the decisions behind the new API.
 
@@ -96,7 +93,7 @@ export default Page.middleware(RandomMiddleware).build(HomePage)
 Notes
 
 - Use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions.
-- Parse/validate values inside your handler using helpers: `Next.decodeParams(...)` and `Next.decodeSearchParams(...)`
+- See `example/utils/params.ts` for a concrete example of parsing `params` and `searchParams` with `Schema`.
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
@@ -171,30 +168,11 @@ const AppLive = Layer.mergeAll(WrappedLive)
 const Page = Next.make("Home", AppLive).middleware(Wrapped)
 ```
 
-### Parsing params, searchParams
+### Next.js components
 
-Use `Schema` to validate/transform values explicitly inside your handler.
+`Next.make(tag, layer).build(handler)` is generic and works for every export.
 
-```ts
-import { Schema } from "effect"
-import { Next } from "@mcrovero/effect-nextjs"
-
-// Params and searchParams (Page)
-const HomePage = Effect.fn("Home")(function* (props: {
-  params: Promise<Record<string, string | undefined>>
-  searchParams: Promise<Record<string, string | undefined>>
-}) {
-  const params = yield* Next.decodeParams(Schema.Struct({ id: Schema.String }))(props)
-  const searchParams = yield* Next.decodeSearchParams(Schema.Struct({ q: Schema.optional(Schema.String) }))(props)
-  return { params, searchParams }
-})
-
-export default Next.make("Home", AppLive).build(HomePage)
-```
-
-### Routes (app/api)
-
-`Next.make(tag, layer).build(handler)` is generic and works for route handlers too. Define your `GET`, `POST`, etc. by exporting the built function. The handler receives the same arguments you would pass to a Next.js route (e.g. `request: NextRequest`).
+Route example:
 
 ```ts
 // app/api/time/route.ts
@@ -214,9 +192,7 @@ export const GET = Next.make("ServerTimeRoute", AppLive).middleware(TimeMiddlewa
 // Similarly for POST/PUT/DELETE, export POST/PUT/DELETE with the same pattern.
 ```
 
-### Server actions
-
-Next.js requires every exported server action to be an async function at the export site. Use `Next.make(...).build(handler)` and keep the program definition separate from the export for better DX (type errors will surface at the export site without masking the handler body).
+Server action
 
 ```ts
 import * as Context from "effect/Context"
@@ -245,10 +221,8 @@ const _updateName = Effect.fn("updateName")((input: { name: string }) =>
 )
 
 // Exported server action: call .build(program)(input)
-export const updateName = async (input: { name: string }) => UpdateNameAction.build(_updateName)(input)
+export const updateName = UpdateNameAction.build(_updateName)
 ```
-
-This split keeps your handler body clean and debuggable while ensuring the export remains an async function as required by Next.js.
 
 ### Next.js Route Props Helpers Integration
 
@@ -270,6 +244,7 @@ const blogPage = Next.make("BlogPage", AppLive).build(
     )
   })
 )
+export default blogPage
 
 // Layout with parallel routes support
 const dashboardLayout = Next.make("DashboardLayout", AppLive).build(
@@ -284,6 +259,7 @@ const dashboardLayout = Next.make("DashboardLayout", AppLive).build(
     )
   })
 )
+export default dashboardLayout
 ```
 
 See the official documentation: - [Next.js 15.5 – Route Props Helpers](https://nextjs.org/docs/app/getting-started/layouts-and-pages#route-props-helpers)
@@ -292,7 +268,7 @@ See the official documentation: - [Next.js 15.5 – Route Props Helpers](https:/
 
 #### Less Opinionated
 
-In the previous version the library was adding too many layers of abstractions, and the scope was too broad. Now it is more focused on the core functionality, and less opinionated. For example in the previous version it was always decoding input from server actions, that, even though it is a good practice, it should not be responsibility of the library and it is now left to the user to decide how to parse the input, decode params/search params, etc. The library provides helpers to do so, but it is up to the user to decide how to use them.
+In the previous version the library was adding too many layers of abstractions, and the scope was too broad. Now it is more focused on the core functionality, and less opinionated. For example in the previous version it was always decoding input from server actions, that, even though it is a good practice, it should not be responsibility of the library and it is now left to the user to decide how to parse the input, decode params/search params, etc.
 
 #### Closer to Next.js APIs
 
@@ -302,4 +278,3 @@ For example in the previous version it was not possible to access parallel route
 #### The Effect way
 
 With the new architecture it also enables a more Effect-like way to build handlers. It is now possible to use `Effect.fn` directly inside the handler, delegating to the official ways to do tracing, logging, etc.
-The only exception is server actions, because of the export requirements of Next.js that hopefully will be addressed in the future and the current .run and .runFn methods will be replaced by a single .build method like the other handlers.

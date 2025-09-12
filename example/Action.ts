@@ -30,8 +30,7 @@ const Action = Effect.fn("Action")(function*(input: { test: string }) {
 })
 
 // The async here is important to satisfy Next.js's requirement for server actions
-export const action = async (props: { test: string }) =>
-  Next.make("Base", AuthLive)
-    .middleware(AuthMiddleware).build(
-      Action
-    )(props)
+export const action = Next.make("Base", AuthLive)
+  .middleware(AuthMiddleware).build(
+    Action
+  )

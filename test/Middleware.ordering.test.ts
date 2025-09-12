@@ -3,7 +3,6 @@ import { deepStrictEqual, strictEqual } from "@effect/vitest/utils"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Next from "../src/Next.js"
-import * as NextAction from "../src/NextAction.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("Middleware ordering", () => {
@@ -133,14 +132,14 @@ describe("Middleware ordering", () => {
       )
 
       const combined = Layer.mergeAll(WrappedLive, NonWrappedLive)
-      const action = NextAction.make("Base", combined)
+      const action = Next.make("Base", combined)
         .middleware(Wrapped)
         .middleware(NonWrapped)
         .middleware(Wrapped)
         .middleware(NonWrapped)
 
-      const result = yield* Effect.promise(() =>
-        action.run(
+      const result = yield* Effect.promise(
+        action.build(() =>
           Effect.gen(function*() {
             yield* Effect.sync(() => order.push("handler"))
             return "ok"
