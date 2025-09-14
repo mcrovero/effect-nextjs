@@ -36,6 +36,24 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 pnpm add @mcrovero/effect-nextjs effect next
 ```
 
+### Install via shadcn/ui registry
+
+If you use the shadcn/ui CLI, you can install this library's source into your project (under `lib/effect-nextjs/`) from this repository's custom registry.
+
+1. Initialize shadcn/ui (if you haven't):
+
+```sh
+npx shadcn@latest init
+```
+
+2. Add the `effect-src` registry item from this repo:
+
+```sh
+npx shadcn@latest add effect-src --registry https://raw.githubusercontent.com/mcrovero/effect-nextjs/main/registry.json
+```
+
+This installs all files from this repo's `src/` into your project's `lib/effect-nextjs/` directory.
+
 2. Define a service and a middleware
 
 ```ts
