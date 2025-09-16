@@ -3,9 +3,6 @@
  */
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
-import * as Effect_ from "effect/Effect"
-import type * as Layer from "effect/Layer"
-import * as Layer_ from "effect/Layer"
 import * as Schema from "effect/Schema"
 import type { Mutable } from "effect/Types"
 
@@ -304,40 +301,4 @@ export const Tag = <Self>(): <
     ? (options as any).returns
     : Schema.Never
   return TagClass as any
-}
-
-/** Infers the required environment `R` from an implementation function. */
-type InferRFromImpl<Impl> = Impl extends (options: any) => Effect.Effect<any, any, infer R> ? R : never
-
-/** Extracts the provided service type from a tag's `provides` property. */
-type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer S> } ? S : never
-
-/** Decodes the failure value from a tag's `failure` schema. */
-type FailureFromTag<M> = M extends { readonly failure: Schema.Schema<infer A, any, any> } ? A : never
-
-/**
- * Builds a `Layer` from a middleware tag and its effectful implementation.
- *
- * The resulting layer registers the implementation under the tag in the
- * environment so that the middleware chain can retrieve and invoke it.
- */
-export function layer<
-  M extends TagClassAny,
-  Impl extends (
-    options:
-      & MiddlewareOptions
-      & (
-        M["wrap"] extends true ? { readonly next: Effect.Effect<any, TagClass.CatchesValue<M>, ProvidedService<M>> }
-          : unknown
-      )
-  ) => Effect.Effect<
-    M["wrap"] extends true ? any : ProvidedService<M>,
-    M["wrap"] extends true ? never : FailureFromTag<M>,
-    InferRFromImpl<Impl>
-  >
->(
-  tag: M,
-  impl: Impl
-): Layer.Layer<Context.Tag.Identifier<M>, never, Exclude<InferRFromImpl<Impl>, ProvidedService<M>>> {
-  return Layer_.effect(tag as any, Effect_.as(Effect_.context<any>() as any, impl as any)) as any
 }

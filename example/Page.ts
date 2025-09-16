@@ -13,7 +13,7 @@ export class ProvideUser extends NextMiddleware.Tag<ProvideUser>()(
   { provides: CurrentUser, failure: Schema.String }
 ) {}
 
-const ProvideUserLive = NextMiddleware.layer(
+const ProvideUserLive = Layer.succeed(
   ProvideUser,
   () => Effect.succeed({ id: "u-1", name: "Alice" })
 )
@@ -27,7 +27,7 @@ export class CatchAll extends NextMiddleware.Tag<CatchAll>()(
   }
 ) {}
 
-const CatchAllLive = NextMiddleware.layer(
+const CatchAllLive = Layer.succeed(
   CatchAll,
   ({ next }) =>
     Effect.gen(function*() {

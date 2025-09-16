@@ -26,7 +26,7 @@ export class CatchAll extends NextMiddleware.Tag<CatchAll>()(
   }
 ) {}
 
-const CatchAllLive = NextMiddleware.layer(
+const CatchAllLive = Layer.succeed(
   CatchAll,
   ({ next }) =>
     Effect.gen(function*() {

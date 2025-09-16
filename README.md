@@ -72,7 +72,10 @@ export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()("AuthMi
 }) {}
 
 // Live implementation for the middleware
-export const AuthLive = NextMiddleware.layer(AuthMiddleware, () => Effect.succeed({ id: "123", name: "Ada" }))
+export const AuthLive = Layer.succeed(
+  AuthMiddleware,
+  AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "Ada" }))
+)
 
 // Combine all lives you need
 const AppLive = Layer.mergeAll(AuthLive)
@@ -116,7 +119,7 @@ Notes
 
 ### Middlewares with dependencies
 
-Use `NextMiddleware.layer(tag, impl)` to define a middleware with or without dependencies.
+Define middleware implementations with `Layer.succeed(Tag, Tag.of(...))` or `Layer.effect(Tag, Effect.gen(... Tag.of(...)))` to support dependencies.
 
 ```ts
 import * as Context from "effect/Context"
@@ -135,10 +138,11 @@ export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()("AuthMi
 }) {}
 
 // Implementation reads from `Other` (its requirement is reflected in the Layer type)
-const AuthLive = NextMiddleware.layer(AuthMiddleware, () =>
+const AuthLive = Layer.effect(
+  AuthMiddleware,
   Effect.gen(function* () {
     const other = yield* Other
-    return { id: "123", name: other.name }
+    return AuthMiddleware.of(() => Effect.succeed({ id: "123", name: other.name }))
   })
 )
 
@@ -172,13 +176,16 @@ export class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", {
   wrap: true
 }) {}
 
-const WrappedLive = NextMiddleware.layer(Wrapped, ({ next }) =>
-  Effect.gen(function* () {
-    // pre logic...
-    const out = yield* Effect.provideService(next, CurrentUser, { id: "u1", name: "Ada" })
-    // post logic...
-    return out
-  })
+const WrappedLive = Layer.succeed(
+  Wrapped,
+  Wrapped.of(({ next }) =>
+    Effect.gen(function* () {
+      // pre logic...
+      const out = yield* Effect.provideService(next, CurrentUser, { id: "u1", name: "Ada" })
+      // post logic...
+      return out
+    })
+  )
 )
 
 const AppLive = Layer.mergeAll(WrappedLive)
@@ -223,7 +230,10 @@ export class Auth extends NextMiddleware.Tag<Auth>()("Auth", {
   provides: CurrentUser
 }) {}
 
-const AuthLive = NextMiddleware.layer(Auth, () => Effect.succeed({ id: "u1", name: "Ada" }))
+const AuthLive = Layer.succeed(
+  Auth,
+  Auth.of(() => Effect.succeed({ id: "u1", name: "Ada" }))
+)
 const AppLive = Layer.mergeAll(AuthLive)
 
 // Prepare a reusable builder (middlewares, runtime, etc.)

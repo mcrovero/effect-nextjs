@@ -199,6 +199,7 @@ const Proto = {
     }
   }
 }
+
 const makeProto = <
   const Tag extends string,
   const L extends Layer.Layer<any, any, any> | undefined,
@@ -279,14 +280,12 @@ type BuildHandler<P extends Any, A extends Array<any>, O> = P extends
   ) => Effect.Effect<O, CatchesFromMiddleware<_Middleware>, ExtractProvides<P>> :
   never
 
-/** Extracts the output type from a `Schema`. */
-type InferSchemaOutput<S> = S extends Schema.Schema<infer A, any, any> ? A : never
 /**
  * Computes the wrapped return type produced by middleware implementing the
  * `wrap` protocol. When no wrapper is present, yields `never`.
  */
 type WrappedReturns<M> = M extends { readonly wrap: true }
-  ? InferSchemaOutput<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
+  ? Schema.Schema.Type<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
   : never
 
 /** Extracts the union of error types that middleware can catch. */
