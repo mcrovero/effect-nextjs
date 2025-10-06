@@ -8,13 +8,14 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 > [!WARNING]
 > This library is in early alpha and is not ready for production use.
 >
-> ### Breaking changes (v0.20.0)
+> ### Breaking changes (v0.21.0)
 >
 > - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions.
 > - Removed `Next.make().actions()/.layout()/.component()`, `NextPage`, `NextLayout`, and `NextServerComponent`.
 > - Server actions: use `Next.make(tag, layer).build(handler)` no more NextAction.
 > - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. See `example/utils/params.ts` for example helper utilities to parse `params` and `searchParams` with `Schema`.
 >   The `tag` passed to `Next.make` should be unique per handler to enable safe HMR during development.
+> - Removed NextMiddleware.layer()
 >
 > Read at the bottom of the README for more details on the decisions behind the new API.
 
