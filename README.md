@@ -100,6 +100,34 @@ Notes
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
+#### Providing a ManagedRuntime directly
+
+You can also pass a `ManagedRuntime` instead of a `Layer` when creating a handler. When a runtime is provided explicitly, it will be used as-is and is not registered in the HMR runtime registry (you manage its lifecycle).
+
+```ts
+import * as Effect from "effect/Effect"
+import * as ManagedRuntime from "effect/ManagedRuntime"
+import { Layer } from "effect"
+import { Next } from "@mcrovero/effect-nextjs"
+
+// Build your runtime once (for example, to share across handlers)
+const AppLive = Layer.mergeAll()
+const runtime = ManagedRuntime.make(AppLive)
+
+// Provide the runtime directly
+const Page = Next.make("BasePageWithRuntime", runtime)
+
+const HomePage = Effect.fn("HomePage")(function* () {
+  return "ok" as const
+})
+
+export default Page.build(HomePage)
+```
+
+Notes:
+
+- In development, when you pass a `Layer`, the library registers and replaces the runtime in a global registry to support HMR safely. When you pass a `ManagedRuntime` directly, the registry is not updated; disposing/replacing the runtime is up to you.
+
 ### Middlewares with dependencies
 
 Define middleware implementations with `Layer.succeed(Tag, Tag.of(...))` or `Layer.effect(Tag, Effect.gen(... Tag.of(...)))` to support dependencies.
