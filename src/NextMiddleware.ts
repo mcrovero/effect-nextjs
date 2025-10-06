@@ -13,28 +13,16 @@ import type { Mutable } from "effect/Types"
 export const TypeId: unique symbol = Symbol.for("@mcrovero/effect-nextjs/Middleware")
 
 /**
- * Type alias for the unique `TypeId` used to brand middleware tag classes.
- *
  * @since 0.5.0
  * @category type ids
  */
 export type TypeId = typeof TypeId
 
-/**
- * Internal options passed to middleware implementations.
- *
- * - `props` carries arguments from the outer handler (e.g. request params)
- */
 type MiddlewareOptions = {
   props: unknown
 }
 
 /**
- * Simple middleware contract.
- *
- * Produces or validates part of the environment (`Provides`), can fail with
- * `E`, and requires environment `R`.
- *
  * @since 0.5.0
  * @category models
  */
@@ -43,12 +31,6 @@ export interface NextMiddleware<Provides, E, R = never> {
 }
 
 /**
- * Wrapper middleware contract.
- *
- * Intercepts execution by receiving a `next` effect. It can catch structured
- * errors (`Catches`) from `next` and map them to success. It requires
- * environment `R` and returns any value (often response-like).
- *
  * @since 0.5.0
  * @category models
  */
@@ -59,21 +41,6 @@ export interface NextMiddlewareWrap<Provides, Catches, R> {
 }
 
 /**
- * Erased middleware function shape used internally for dynamic composition.
- *
- * @since 0.5.0
- * @category models
- */
-export interface Any {
-  (options: { readonly payload: unknown; readonly next?: Effect.Effect<any, any, any> }): Effect.Effect<any, any, any>
-}
-
-/**
- * Strongly-typed tag class representing a middleware capability.
- *
- * The concrete service type depends on whether the tag is a wrapper (`wrap`
- * true) or a regular middleware.
- *
  * @since 0.5.0
  * @category models
  */
@@ -114,8 +81,6 @@ export declare namespace TagClass {
     : void
 
   /**
-   * Schema describing failures that the middleware may raise.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -125,8 +90,6 @@ export declare namespace TagClass {
     : typeof Schema.Never
 
   /**
-   * Decoded failure value type from `FailureSchema`.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -136,24 +99,18 @@ export declare namespace TagClass {
     : never
 
   /**
-   * Context required to decode failures for the schema.
-   *
    * @since 0.5.0
    * @category models
    */
   export type FailureContext<Options> = Schema.Schema.Context<FailureSchema<Options>>
 
   /**
-   * Alias of `Failure` to emphasize the value-level failure channel.
-   *
    * @since 0.5.0
    * @category models
    */
   export type FailureService<Options> = Failure<Options>
 
   /**
-   * Whether the middleware is a wrapper (receives `next`).
-   *
    * @since 0.5.0
    * @category models
    */
@@ -170,8 +127,6 @@ export declare namespace TagClass {
     : typeof Schema.Never
 
   /**
-   * Decoded value type of the `catches` schema.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -189,8 +144,6 @@ export declare namespace TagClass {
     : typeof Schema.Never
 
   /**
-   * Base structural shape of a middleware tag class.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -221,9 +174,6 @@ export interface TagClassAny extends Context.Tag<any, any> {
 }
 
 /**
- * Erased tag class variant whose service is a concrete middleware function.
- * Used by the middleware chain during execution.
- *
  * @since 0.5.0
  * @category models
  */
@@ -239,12 +189,6 @@ export interface TagClassAnyWithProps
 }
 
 /**
- * Creates a strongly-typed middleware tag class.
- *
- * Overloaded on `Options.wrap` to produce either a wrapper or a simple
- * middleware. Optional `failure`, `provides`, `catches`, and `returns` schemas
- * configure type-level behavior and runtime metadata.
- *
  * @since 0.5.0
  * @category tags
  */

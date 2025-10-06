@@ -27,8 +27,6 @@ const NextSymbolKey = "@mcrovero/effect-nextjs/Next"
 export const TypeId: unique symbol = Symbol.for(NextSymbolKey)
 
 /**
- * Type alias for the unique `TypeId` symbol used to brand `Next`.
- *
  * @since 0.5.0
  * @category type ids
  */
@@ -43,7 +41,7 @@ export type TypeId = typeof TypeId
  * @since 0.5.0
  * @category models
  */
-export interface Any extends Pipeable {
+interface Any extends Pipeable {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
@@ -56,7 +54,7 @@ export interface Any extends Pipeable {
  * @since 0.5.0
  * @category models
  */
-export interface AnyWithProps {
+interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
@@ -70,16 +68,6 @@ export interface AnyWithProps {
 type LayerSuccess<L> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
 /**
- * Strongly-typed constructor for building Next.js handlers with Effect.
- *
- * - `Tag` is a string identifier for this handler family.
- * - `L` is an optional `Layer` to provision the Effect environment.
- * - `Middleware` is the union of middleware tags attached to the instance.
- *
- * Instances are constructor functions enriched with metadata and helper
- * methods, notably `middleware` for composition and `build` to produce an
- * async function consumable by Next.js.
- *
  * @since 0.5.0
  * @category models
  */
@@ -108,7 +96,7 @@ export interface Next<
 
   /**
    * Finalizes the handler by supplying an Effect-based implementation and
-   * returns an async function compatible with Next.js route APIs.
+   * returns an async function compatible with Next.js.
    */
   build<
     A extends Array<any>,
@@ -136,9 +124,6 @@ const Proto = {
   pipe() {
     return pipeArguments(this, arguments)
   },
-  /**
-   * Adds a middleware tag to this handler instance.
-   */
   middleware(this: AnyWithProps, middleware: NextMiddleware.TagClassAny) {
     if (this.runtime) {
       return makeProto({
@@ -152,12 +137,6 @@ const Proto = {
       middlewares: [...this.middlewares, middleware]
     } as any)
   },
-
-  /**
-   * Binds an Effectful handler and produces an async function suitable for
-   * Next.js. It composes configured middlewares and executes within the
-   * associated `ManagedRuntime` when present (supporting HMR in dev).
-   */
   build<
     A extends Array<any>,
     O
@@ -211,11 +190,6 @@ const makeProto = <
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
 }): Next<Tag, L, Middleware> => {
-  /**
-   * @internal Internal constructor function used as the value of a `Next`
-   * instance. The function itself is never called; it exists to carry the
-   * prototype and static props.
-   */
   function Next() {}
   Object.setPrototypeOf(Next, Proto)
   Object.assign(Next, options)
@@ -224,8 +198,6 @@ const makeProto = <
 }
 
 /**
- * Creates a `Next` handler constructor without providing a `Layer`.
- *
  * @since 0.5.0
  * @category constructors
  */
@@ -268,11 +240,6 @@ type ExtractProvides<R extends Any> = R extends Next<
 
 /**
  * Signature of the effectful handler accepted by `build`.
- *
- * - `A` are the runtime arguments of the produced async function
- * - `O` is the success value of the effect
- * - The error channel is constrained by the union of middleware "catches"
- * - The required environment is computed from the `Next` instance
  */
 type BuildHandler<P extends Any, A extends Array<any>, O> = P extends
   Next<infer _Tag, infer _Layer, infer _Middleware> ? (
@@ -291,13 +258,6 @@ type WrappedReturns<M> = M extends { readonly wrap: true }
 /** Extracts the union of error types that middleware can catch. */
 type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A : never
 
-/**
- * Minimal structural view of a `Schema` used here to avoid pulling concrete
- * schema types into the public surface area.
- *
- * @since 0.5.0
- * @category models
- */
 interface AnySchema extends Pipeable {
   readonly [Schema.TypeId]: any
   readonly Type: any

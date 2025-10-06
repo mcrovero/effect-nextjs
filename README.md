@@ -36,8 +36,6 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 pnpm add @mcrovero/effect-nextjs effect next
 ```
 
-This installs all files from this repo's `src/` into your project's `lib/effect-nextjs/` directory.
-
 2. Define a service and a middleware
 
 ```ts

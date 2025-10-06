@@ -40,7 +40,7 @@ describe("Next defects", () => {
         "DefectMiddleware"
       ) {}
 
-      const DefectLive: Layer.Layer<DefectMiddleware> = NextMiddleware.layer(
+      const DefectLive: Layer.Layer<DefectMiddleware> = Layer.succeed(
         DefectMiddleware,
         // Defer throwing to inside Effect to be caught/logged
         () =>

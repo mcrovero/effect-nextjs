@@ -18,7 +18,7 @@ describe("Next wrap middleware", () => {
         returns: Schema.String
       }) {}
 
-      const WrapLive: Layer.Layer<Wrap> = NextMiddleware.layer(
+      const WrapLive: Layer.Layer<Wrap> = Layer.succeed(
         Wrap,
         ({ next }) => Effect.as(next, "overridden")
       )
