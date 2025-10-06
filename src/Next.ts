@@ -186,24 +186,14 @@ export function make<
   tag: Tag,
   layer: L
 ): Next<Tag, L>
-export function make<
-  const Tag extends string,
-  const R extends ManagedRuntime.ManagedRuntime<any, any>
->(
-  tag: Tag,
-  runtime: R
-): Next<Tag, undefined>
 export function make(
   tag: string,
-  layerOrRuntime?: Layer.Layer<any, any, never> | ManagedRuntime.ManagedRuntime<any, any>
+  layer?: Layer.Layer<any, any, never>
 ): Next<any, any> {
-  if (layerOrRuntime) {
-    const isRuntime = isManagedRuntime(layerOrRuntime)
-    const runtime = isRuntime ? layerOrRuntime : ManagedRuntime.make(layerOrRuntime)
-    if (isRuntime == false) {
-      // We set the runtime in the registry only if created by libary if not the user manages it
-      setRuntime(`${NextSymbolKey}/${tag}`, runtime)
-    }
+  if (layer) {
+    const runtime = ManagedRuntime.make(layer)
+    // We set the runtime in the registry only if created by libary if not the user manages it
+    setRuntime(`${NextSymbolKey}/${tag}`, runtime)
     return makeProto({
       _tag: tag as any,
       runtime,
@@ -216,10 +206,23 @@ export function make(
   })
 }
 
-const isManagedRuntime = (
-  value: unknown
-): value is ManagedRuntime.ManagedRuntime<any, any> =>
-  typeof value === "object" && value !== null && "runPromiseExit" in (value as any)
+/**
+ * @since 0.5.0
+ * @category constructors
+ */
+export function makeWithRuntime<
+  const Tag extends string,
+  const R extends ManagedRuntime.ManagedRuntime<any, any>
+>(
+  tag: Tag,
+  runtime: R
+): Next<Tag, undefined> {
+  return makeProto({
+    _tag: tag as any,
+    runtime,
+    middlewares: [] as Array<never>
+  })
+}
 
 /**
  * Computes the environment required by a `Next` handler: the environment

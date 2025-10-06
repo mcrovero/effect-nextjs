@@ -102,7 +102,7 @@ Notes
 
 #### Providing a ManagedRuntime directly
 
-You can also pass a `ManagedRuntime` instead of a `Layer` when creating a handler. When a runtime is provided explicitly, it will be used as-is and is not registered in the HMR runtime registry (you manage its lifecycle).
+You can also pass a `ManagedRuntime` instead of a `Layer` when creating a handler using `Next.makeWithRuntime(tag, runtime)`. When a runtime is provided explicitly, it will be used as-is and is not registered in the HMR runtime registry (you manage its lifecycle).
 
 ```ts
 import * as Effect from "effect/Effect"
@@ -115,7 +115,7 @@ const AppLive = Layer.mergeAll()
 const runtime = ManagedRuntime.make(AppLive)
 
 // Provide the runtime directly
-const Page = Next.make("BasePageWithRuntime", runtime)
+const Page = Next.makeWithRuntime("BasePageWithRuntime", runtime)
 
 const HomePage = Effect.fn("HomePage")(function* () {
   return "ok" as const

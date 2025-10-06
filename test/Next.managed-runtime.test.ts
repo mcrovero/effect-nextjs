@@ -14,7 +14,7 @@ describe("Next with provided ManagedRuntime", () => {
         }
       } as unknown as ManagedRuntime.ManagedRuntime<any, any>
 
-      const page = Next.make("ProvidedRuntime", runtime)
+      const page = Next.makeWithRuntime("ProvidedRuntime", runtime)
 
       const result = yield* Effect.promise(() => page.build(() => Effect.succeed(123 as const))())
 
@@ -34,7 +34,7 @@ describe("Next with provided ManagedRuntime", () => {
         }
       } as unknown as ManagedRuntime.ManagedRuntime<any, any>
 
-      const page = Next.make("NoRegistryForProvided", runtime)
+      const page = Next.makeWithRuntime("NoRegistryForProvided", runtime)
 
       const _ = yield* Effect.promise(() => page.build(() => Effect.succeed("ok" as const))())
       assert.strictEqual(_, "ok")
