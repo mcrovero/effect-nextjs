@@ -32,28 +32,12 @@ export const TypeId: unique symbol = Symbol.for(NextSymbolKey)
  */
 export type TypeId = typeof TypeId
 
-/**
- * Minimal common surface shared by all `Next` constructors at runtime.
- *
- * This interface captures the brand, tag and unique key stored on the
- * constructor function value.
- *
- * @since 0.5.0
- * @category models
- */
 interface Any extends Pipeable {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
 }
 
-/**
- * Internal shape for `Next` constructors carrying configured middlewares and
- * an optional managed runtime.
- *
- * @since 0.5.0
- * @category models
- */
 interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
@@ -112,13 +96,6 @@ export interface Next<
   >
 }
 
-/**
- * Prototype used to back `Next` constructor instances.
- *
- * @since 0.5.0
- * @category internal
- * @internal
- */
 const Proto = {
   [TypeId]: TypeId,
   pipe() {

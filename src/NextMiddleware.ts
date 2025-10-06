@@ -59,8 +59,6 @@ export type TagClass<Self, Name extends string, Options, R> = TagClass.Base<
  */
 export declare namespace TagClass {
   /**
-   * Extracts the identifier type of the provided `Context.Tag`.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -70,8 +68,6 @@ export declare namespace TagClass {
     : never
 
   /**
-   * Service value provided by the middleware when `provides` is specified.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -117,8 +113,6 @@ export declare namespace TagClass {
   export type Wrap<Options> = Options extends { readonly wrap: true } ? true : false
 
   /**
-   * Schema of errors that a wrapper middleware can catch from `next`.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -133,9 +127,6 @@ export declare namespace TagClass {
   export type CatchesValue<Options> = CatchesSchema<Options> extends Schema.Schema<infer A, any, any> ? A : never
 
   /**
-   * Schema describing additional wrapped return value produced by wrapper
-   * middlewares.
-   *
    * @since 0.5.0
    * @category models
    */
@@ -159,8 +150,6 @@ export declare namespace TagClass {
 }
 
 /**
- * Erased view of a middleware tag class (no generic parameters).
- *
  * @since 0.5.0
  * @category models
  */
