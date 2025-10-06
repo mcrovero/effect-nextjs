@@ -3,9 +3,6 @@
  */
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
-import * as Effect_ from "effect/Effect"
-import type * as Layer from "effect/Layer"
-import * as Layer_ from "effect/Layer"
 import * as Schema from "effect/Schema"
 import type { Mutable } from "effect/Types"
 
@@ -41,14 +38,6 @@ export interface NextMiddlewareWrap<Provides, Catches, R> {
   (
     options: MiddlewareOptions & { readonly next: Effect.Effect<any, Catches, Provides> }
   ): Effect.Effect<any, never, R>
-}
-
-/**
- * @since 0.5.0
- * @category models
- */
-export interface Any {
-  (options: { readonly payload: unknown; readonly next?: Effect.Effect<any, any, any> }): Effect.Effect<any, any, any>
 }
 
 /**
@@ -245,31 +234,4 @@ export const Tag = <Self>(): <
     ? (options as any).returns
     : Schema.Never
   return TagClass as any
-}
-
-type InferRFromImpl<Impl> = Impl extends (options: any) => Effect.Effect<any, any, infer R> ? R : never
-
-type ProvidedService<M> = M extends { readonly provides: Context.Tag<any, infer S> } ? S : never
-
-type FailureFromTag<M> = M extends { readonly failure: Schema.Schema<infer A, any, any> } ? A : never
-
-export function layer<
-  M extends TagClassAny,
-  Impl extends (
-    options:
-      & MiddlewareOptions
-      & (
-        M["wrap"] extends true ? { readonly next: Effect.Effect<any, TagClass.CatchesValue<M>, ProvidedService<M>> }
-          : unknown
-      )
-  ) => Effect.Effect<
-    M["wrap"] extends true ? any : ProvidedService<M>,
-    M["wrap"] extends true ? never : FailureFromTag<M>,
-    InferRFromImpl<Impl>
-  >
->(
-  tag: M,
-  impl: Impl
-): Layer.Layer<Context.Tag.Identifier<M>, never, Exclude<InferRFromImpl<Impl>, ProvidedService<M>>> {
-  return Layer_.effect(tag as any, Effect_.as(Effect_.context<any>() as any, impl as any)) as any
 }

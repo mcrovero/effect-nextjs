@@ -8,13 +8,14 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 > [!WARNING]
 > This library is in early alpha and is not ready for production use.
 >
-> ### Breaking changes (v0.20.0)
+> ### Breaking changes (v0.21.0)
 >
 > - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions.
 > - Removed `Next.make().actions()/.layout()/.component()`, `NextPage`, `NextLayout`, and `NextServerComponent`.
 > - Server actions: use `Next.make(tag, layer).build(handler)` no more NextAction.
 > - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. See `example/utils/params.ts` for example helper utilities to parse `params` and `searchParams` with `Schema`.
 >   The `tag` passed to `Next.make` should be unique per handler to enable safe HMR during development.
+> - Removed NextMiddleware.layer()
 >
 > Read at the bottom of the README for more details on the decisions behind the new API.
 
@@ -54,7 +55,10 @@ export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()("AuthMi
 }) {}
 
 // Live implementation for the middleware
-export const AuthLive = NextMiddleware.layer(AuthMiddleware, () => Effect.succeed({ id: "123", name: "Ada" }))
+export const AuthLive = Layer.succeed(
+  AuthMiddleware,
+  AuthMiddleware.of(() => Effect.succeed({ id: "123", name: "Ada" }))
+)
 
 // Combine all lives you need
 const AppLive = Layer.mergeAll(AuthLive)
@@ -96,9 +100,37 @@ Notes
 - You can add multiple middlewares with `.middleware(...)`. Middlewares can be marked `wrap` via the tag options to run before/after the handler.
 - You can use this together with [`@mcrovero/effect-react-cache`](https://github.com/mcrovero/effect-react-cache) to cache `Effect`-based functions between pages, layouts, and components.
 
+#### Providing a ManagedRuntime directly
+
+You can also pass a `ManagedRuntime` instead of a `Layer` when creating a handler using `Next.makeWithRuntime(tag, runtime)`. When a runtime is provided explicitly, it will be used as-is and is not registered in the HMR runtime registry (you manage its lifecycle).
+
+```ts
+import * as Effect from "effect/Effect"
+import * as ManagedRuntime from "effect/ManagedRuntime"
+import { Layer } from "effect"
+import { Next } from "@mcrovero/effect-nextjs"
+
+// Build your runtime once (for example, to share across handlers)
+const AppLive = Layer.mergeAll()
+const runtime = ManagedRuntime.make(AppLive)
+
+// Provide the runtime directly
+const Page = Next.makeWithRuntime("BasePageWithRuntime", runtime)
+
+const HomePage = Effect.fn("HomePage")(function* () {
+  return "ok" as const
+})
+
+export default Page.build(HomePage)
+```
+
+Notes:
+
+- In development, when you pass a `Layer`, the library registers and replaces the runtime in a global registry to support HMR safely. When you pass a `ManagedRuntime` directly, the registry is not updated; disposing/replacing the runtime is up to you.
+
 ### Middlewares with dependencies
 
-Use `NextMiddleware.layer(tag, impl)` to define a middleware with or without dependencies.
+Define middleware implementations with `Layer.succeed(Tag, Tag.of(...))` or `Layer.effect(Tag, Effect.gen(... Tag.of(...)))` to support dependencies.
 
 ```ts
 import * as Context from "effect/Context"
@@ -117,10 +149,11 @@ export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()("AuthMi
 }) {}
 
 // Implementation reads from `Other` (its requirement is reflected in the Layer type)
-const AuthLive = NextMiddleware.layer(AuthMiddleware, () =>
+const AuthLive = Layer.effect(
+  AuthMiddleware,
   Effect.gen(function* () {
     const other = yield* Other
-    return { id: "123", name: other.name }
+    return AuthMiddleware.of(() => Effect.succeed({ id: "123", name: other.name }))
   })
 )
 
@@ -154,13 +187,16 @@ export class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", {
   wrap: true
 }) {}
 
-const WrappedLive = NextMiddleware.layer(Wrapped, ({ next }) =>
-  Effect.gen(function* () {
-    // pre logic...
-    const out = yield* Effect.provideService(next, CurrentUser, { id: "u1", name: "Ada" })
-    // post logic...
-    return out
-  })
+const WrappedLive = Layer.succeed(
+  Wrapped,
+  Wrapped.of(({ next }) =>
+    Effect.gen(function* () {
+      // pre logic...
+      const out = yield* Effect.provideService(next, CurrentUser, { id: "u1", name: "Ada" })
+      // post logic...
+      return out
+    })
+  )
 )
 
 const AppLive = Layer.mergeAll(WrappedLive)
@@ -205,7 +241,10 @@ export class Auth extends NextMiddleware.Tag<Auth>()("Auth", {
   provides: CurrentUser
 }) {}
 
-const AuthLive = NextMiddleware.layer(Auth, () => Effect.succeed({ id: "u1", name: "Ada" }))
+const AuthLive = Layer.succeed(
+  Auth,
+  Auth.of(() => Effect.succeed({ id: "u1", name: "Ada" }))
+)
 const AppLive = Layer.mergeAll(AuthLive)
 
 // Prepare a reusable builder (middlewares, runtime, etc.)

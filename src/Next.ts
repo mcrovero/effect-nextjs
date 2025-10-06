@@ -7,10 +7,11 @@ import type * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
+import type * as Schema from "effect/Schema"
+import type * as AST from "effect/SchemaAST"
 import { executeWithRuntime } from "./internal/executor.js"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
 import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
-import type { AnySchema, CatchesFromMiddleware, WrappedReturns } from "./internal/shared.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -18,15 +19,6 @@ import type * as NextMiddleware from "./NextMiddleware.js"
  * @category constants
  */
 const NextSymbolKey = "@mcrovero/effect-nextjs/Next"
-
-/**
- * @since 0.5.0
- * @category models
- */
-export interface NextBaseProps {
-  readonly params: Promise<Record<string, string | Array<string> | undefined>>
-  readonly searchParams: Promise<Record<string, string | Array<string> | undefined>>
-}
 
 /**
  * @since 0.5.0
@@ -40,21 +32,13 @@ export const TypeId: unique symbol = Symbol.for(NextSymbolKey)
  */
 export type TypeId = typeof TypeId
 
-/**
- * @since 0.5.0
- * @category models
- */
-export interface Any extends Pipeable {
+interface Any extends Pipeable {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
 }
 
-/**
- * @since 0.5.0
- * @category models
- */
-export interface AnyWithProps {
+interface AnyWithProps {
   readonly [TypeId]: TypeId
   readonly _tag: string
   readonly key: string
@@ -62,6 +46,9 @@ export interface AnyWithProps {
   readonly runtime?: ManagedRuntime.ManagedRuntime<any, any>
 }
 
+/**
+ * Extracts the provided environment from a `Layer`.
+ */
 type LayerSuccess<L> = L extends Layer.Layer<infer ROut, any, any> ? ROut : never
 
 /**
@@ -83,10 +70,18 @@ export interface Next<
   readonly paramsSchema?: AnySchema
   readonly searchParamsSchema?: AnySchema
 
+  /**
+   * Adds a middleware tag to this handler. The middleware must be satisfied by
+   * the environment provided by `L`.
+   */
   middleware<M extends NextMiddleware.TagClassAny>(
     middleware: Context_.Tag.Identifier<M> extends LayerSuccess<L> ? M : never
   ): Next<Tag, L, Middleware | M>
 
+  /**
+   * Finalizes the handler by supplying an Effect-based implementation and
+   * returns an async function compatible with Next.js.
+   */
   build<
     A extends Array<any>,
     O
@@ -101,10 +96,6 @@ export interface Next<
   >
 }
 
-/**
- * @since 0.5.0
- * @category models
- */
 const Proto = {
   [TypeId]: TypeId,
   pipe() {
@@ -123,7 +114,6 @@ const Proto = {
       middlewares: [...this.middlewares, middleware]
     } as any)
   },
-
   build<
     A extends Array<any>,
     O
@@ -165,6 +155,7 @@ const Proto = {
     }
   }
 }
+
 const makeProto = <
   const Tag extends string,
   const L extends Layer.Layer<any, any, any> | undefined,
@@ -195,9 +186,13 @@ export function make<
   tag: Tag,
   layer: L
 ): Next<Tag, L>
-export function make(tag: string, layer?: Layer.Layer<any, any, never>): Next<any, any> {
+export function make(
+  tag: string,
+  layer?: Layer.Layer<any, any, never>
+): Next<any, any> {
   if (layer) {
     const runtime = ManagedRuntime.make(layer)
+    // We set the runtime in the registry only if created by libary if not the user manages it
     setRuntime(`${NextSymbolKey}/${tag}`, runtime)
     return makeProto({
       _tag: tag as any,
@@ -211,6 +206,28 @@ export function make(tag: string, layer?: Layer.Layer<any, any, never>): Next<an
   })
 }
 
+/**
+ * @since 0.5.0
+ * @category constructors
+ */
+export function makeWithRuntime<
+  const Tag extends string,
+  const R extends ManagedRuntime.ManagedRuntime<any, any>
+>(
+  tag: Tag,
+  runtime: R
+): Next<Tag, undefined> {
+  return makeProto({
+    _tag: tag as any,
+    runtime,
+    middlewares: [] as Array<never>
+  })
+}
+
+/**
+ * Computes the environment required by a `Next` handler: the environment
+ * provided by its `Layer` plus any environments declared by middleware tags.
+ */
 type ExtractProvides<R extends Any> = R extends Next<
   infer _Tag,
   infer _Layer,
@@ -220,8 +237,31 @@ type ExtractProvides<R extends Any> = R extends Next<
     | (_Middleware extends { readonly provides: Context_.Tag<infer _I, any> } ? _I : never)
   : never
 
+/**
+ * Signature of the effectful handler accepted by `build`.
+ */
 type BuildHandler<P extends Any, A extends Array<any>, O> = P extends
   Next<infer _Tag, infer _Layer, infer _Middleware> ? (
     ...args: A
   ) => Effect.Effect<O, CatchesFromMiddleware<_Middleware>, ExtractProvides<P>> :
   never
+
+/**
+ * Computes the wrapped return type produced by middleware implementing the
+ * `wrap` protocol. When no wrapper is present, yields `never`.
+ */
+type WrappedReturns<M> = M extends { readonly wrap: true }
+  ? Schema.Schema.Type<M extends { readonly returns: infer S } ? S : typeof Schema.Never>
+  : never
+
+/** Extracts the union of error types that middleware can catch. */
+type CatchesFromMiddleware<M> = M extends { readonly catches: Schema.Schema<infer A, any, any> } ? A : never
+
+interface AnySchema extends Pipeable {
+  readonly [Schema.TypeId]: any
+  readonly Type: any
+  readonly Encoded: any
+  readonly Context: any
+  readonly make?: (params: any, ...rest: ReadonlyArray<any>) => any
+  readonly ast: AST.AST
+}
