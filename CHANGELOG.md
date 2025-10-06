@@ -1,5 +1,13 @@
 # @mcrovero/effect-nextjs
 
+## 0.21.0
+
+### Minor Changes
+
+- [#42](https://github.com/mcrovero/effect-nextjs/pull/42) [`8af5aa5`](https://github.com/mcrovero/effect-nextjs/commit/8af5aa54944cc7857270c303cef50ae7e3ae110a) Thanks @mcrovero! - - feat: Add option to pass a `ManagedRuntime` using `Next.makeWithRuntime(tag, runtime)`, in addition to the existing `Next.make(tag, layer)`.
+  - When a runtime is provided explicitly, it is used as-is and is not registered in the HMR runtime registry; lifecycle is user-managed.
+  - breaking: Remove `NextMiddleware.layer` utility.
+
 ## 0.20.0
 
 ### Minor Changes
