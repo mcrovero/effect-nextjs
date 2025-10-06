@@ -28,10 +28,11 @@ export class CatchAll extends NextMiddleware.Tag<CatchAll>()(
 
 const CatchAllLive = Layer.succeed(
   CatchAll,
-  ({ next }) =>
+  CatchAll.of(({ next }) =>
     Effect.gen(function*() {
       return yield* next.pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
     })
+  )
 )
 
 const app = Layer.mergeAll(CatchAllLive, ThemeLive)
