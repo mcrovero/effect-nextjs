@@ -1,16 +1,7 @@
 import type * as ManagedRuntime from "effect/ManagedRuntime"
 
 /**
- * Runtime Registry for Hot Module Replacement (HMR) Support
- *
- * This utility is essential for supporting Hot Module Replacement in development environments.
- * Without it, HMR would break Effect-based Next.js applications due to runtime lifecycle issues.
- *
- * Usage:
- * - setRuntime(tag, runtime): Store runtime in registry (dev) or noop (prod)
- * - getRuntime(tag, fallback): Get runtime from registry (dev) or return fallback (prod)
- *
- * This ensures HMR works seamlessly while maintaining performance in production.
+ * Runtime Registry for Hot Module Replacement (HMR) and Singleton runtime support
  */
 declare global {
   var __effect_nextjs_runtime_registry__:
@@ -19,25 +10,17 @@ declare global {
 }
 
 /**
- * Sets a runtime in the global registry for development mode.
- * In production, this is a no-op.
- *
- * @param runtimeTag - The tag to identify the runtime
- * @param runtime - The runtime to register
+ * Sets a runtime in the global registry
  */
 export const setRuntime = (
   key: string,
   runtime: ManagedRuntime.ManagedRuntime<any, any>
 ): void => {
-  const isDev = process.env.NODE_ENV !== "production"
-  if (!isDev) return
-
   const registry = (globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {})
 
-  // Dispose of previous runtime if it exists to prevent memory leaks
+  // Dispose of previous runtime if it exists to prevent memory leaks in dev
   const previous = registry[key]
-  if (previous && typeof previous.dispose === "function") {
-    // fire-and-forget: ensure previous scoped resources/fibers are finalized
+  if (previous && typeof previous.dispose === "function" && process.env.NODE_ENV !== "production") {
     void previous.dispose()
   }
 
@@ -45,20 +28,12 @@ export const setRuntime = (
 }
 
 /**
- * Gets a runtime from the global registry for development mode.
- * In production or if no runtime is found in the registry, returns the provided fallback runtime.
- *
- * @param key - The key to identify the runtime
- * @param fallbackRuntime - The runtime to use as fallback
- * @returns The runtime from registry (dev) or the fallback runtime (prod/no registry)
+ * Gets a runtime from the global registry
  */
 export const getRuntime = <T extends ManagedRuntime.ManagedRuntime<any, any>>(
   key: string,
   fallbackRuntime: T
 ): T => {
-  const isDev = process.env.NODE_ENV !== "production"
-  if (!isDev) return fallbackRuntime
-
   const registry = globalThis.__effect_nextjs_runtime_registry__
   if (registry && registry[key]) {
     return registry[key] as T
@@ -66,3 +41,21 @@ export const getRuntime = <T extends ManagedRuntime.ManagedRuntime<any, any>>(
 
   return fallbackRuntime
 }
+
+process.on("SIGINT", () => {
+  const registry = globalThis.__effect_nextjs_runtime_registry__
+  if (registry) {
+    Object.values(registry).forEach((runtime) => {
+      void runtime?.dispose()
+    })
+  }
+})
+
+process.on("SIGTERM", () => {
+  const registry = globalThis.__effect_nextjs_runtime_registry__
+  if (registry) {
+    Object.values(registry).forEach((runtime) => {
+      void runtime?.dispose()
+    })
+  }
+})
