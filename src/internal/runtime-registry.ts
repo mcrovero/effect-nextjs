@@ -16,15 +16,15 @@ export const setRuntime = (
   key: string,
   runtime: ManagedRuntime.ManagedRuntime<any, any>
 ): void => {
-  const registry = (globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {})
+  globalThis.__effect_nextjs_runtime_registry__ = globalThis.__effect_nextjs_runtime_registry__ ?? {}
 
   // Dispose of previous runtime if it exists to prevent memory leaks in dev
-  const previous = registry[key]
-  if (previous && typeof previous.dispose === "function" && process.env.NODE_ENV !== "production") {
+  const previous = globalThis.__effect_nextjs_runtime_registry__[key]
+  if (previous && typeof previous.dispose === "function" && process.env.NODE_ENV === "development") {
     void previous.dispose()
   }
 
-  registry[key] = runtime
+  globalThis.__effect_nextjs_runtime_registry__[key] = runtime
 }
 
 /**
