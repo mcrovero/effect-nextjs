@@ -102,7 +102,7 @@ export default AuthenticatedPage.build(HomePage)
 
 ### Effect Next.js utilities
 
-When you need to use nextjs utilities like redirect, notFound, etc. you need to call them using Effect.sync because Effects should always be lazy see
+When you need to use nextjs utilities like redirect, notFound, etc. you need to call them using Effect.sync. Code with side effects should always be lazy in Effect.
 
 ```ts
 import { Effect } from "effect"
@@ -125,8 +125,6 @@ const HomePage = Effect.fn("HomePage")(function* () {
 })
 export default BasePage.build(HomePage)
 ```
-
-Available effect utilities:
 
 Navigation:
 
