@@ -28,8 +28,8 @@
     "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish"
   },
   "peerDependencies": {
-    "effect": "^3.0.0",
-    "next": "^15.0.0"
+    "effect": "^3",
+    "next": "^15"
   },
   "devDependencies": {
     "@babel/cli": "^7.24.8",

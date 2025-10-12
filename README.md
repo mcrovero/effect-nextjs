@@ -7,27 +7,67 @@ Wrapper around Next.js App Router to build pages, layouts, server components, ro
 
 > [!WARNING]
 > This library is in early alpha and is not ready for production use.
->
-> ### Breaking changes (v0.21.0)
->
-> - Consolidated builders: use `Next.make(tag, layer)` for pages, layouts, server components, routes, and server actions.
-> - Removed `Next.make().actions()/.layout()/.component()`, `NextPage`, `NextLayout`, and `NextServerComponent`.
-> - Server actions: use `Next.make(tag, layer).build(handler)` no more NextAction.
-> - Removed `.setParamsSchema(...)`, `.setSearchParamsSchema(...)`, and `.setInputSchema(...)`. See `example/utils/params.ts` for example helper utilities to parse `params` and `searchParams` with `Schema`.
->   The `tag` passed to `Next.make` should be unique per handler to enable safe HMR during development.
-> - Removed NextMiddleware.layer()
->
-> Read at the bottom of the README for more details on the decisions behind the new API.
+
+## Quick Start
+
+1. Install
+
+```sh
+pnpm add @mcrovero/effect-nextjs effect next
+```
+
+2. Minimal page
+
+```ts
+// app/page.tsx
+import * as Effect from "effect/Effect"
+import { Layer } from "effect"
+import { Next } from "@mcrovero/effect-nextjs"
+
+const AppLive = Layer.mergeAll()
+const Page = Next.make("Home", AppLive)
+
+const HomePage = Effect.fn("HomePage")(function* () {
+  return <div>Hello</div>
+})
+
+export default Page.build(HomePage)
+```
+
+3. Add middlewares (optional)
+
+```ts
+// Extend your builder with middlewares
+// See docs/Middlewares.md for patterns and ordering
+export default Page.middleware(Auth).build(HomePage)
+```
+
+For typed route props and layouts, see: [docs/Components.md](docs/Components.md)
+
+## Examples
+
+- Basics: see files under `example/` (e.g. `example/Page.ts`, `example/Route.ts`, `example/ServerComponent.ts`)
+- Stateful services with instrumentation: `example/stateful/`
+  - `example/stateful/instrumentation.ts`
+  - `example/stateful/services-stateful.ts`
+  - `example/stateful/services-ephemeral.ts`
+  - `example/stateful/page.tsx`
+
+## Further reading
+
+- Services & Instrumentation: [docs/Services-and-Instrumentation.md](docs/Services-and-Instrumentation.md)
+- Middlewares: [docs/Middlewares.md](docs/Middlewares.md)
+- Components & Handlers: [docs/Components.md](docs/Components.md)
+- Utils: [docs/Utils.md](docs/Utils.md)
+- Why the new syntax: [docs/Why-New-Syntax.md](docs/Why-New-Syntax.md)
 
 ### Why this library
 
 - **End to end Effect**: You can bring effect gains up to the edge of your nextjs server.
 - **Composable middlewares**: Add middlewares as `Context.Tag`s. Support for both provide-style and `wrap: true` middlewares, with typed `failure`/`catches`/`returns`.
-- **Next.js control flow preserved**: `redirect`, `notFound` etc.. work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected).
-- **Dev HMR safety**: In development, previous `ManagedRuntime`s are disposed on hot reload to prevent resource leaks.
+- **Next.js control flow preserved**: `redirect`, `notFound` etc.. work correctly when thrown inside `Effect` programs (errors are mapped so Next.js handles them as expected). You can also use the Effect versions of these functions.
 - **Per-handler runtime**: Each page/layout/action/component runs on a `ManagedRuntime` built from your `Layer`.
 - **Works with caching**: Pairs well with `@mcrovero/effect-react-cache` for cross-route Effect caching across pages, layouts, components, and routes.
-- **Enriched error stacktraces**: Errors from `Effect` programs are rethrown with a readable stack using `Cause.pretty`, making debugging much clearer in Next.js.
 
 ### Getting Started
 
@@ -102,7 +142,7 @@ Notes
 
 #### Providing a ManagedRuntime directly
 
-You can also pass a `ManagedRuntime` instead of a `Layer` when creating a handler using `Next.makeWithRuntime(tag, runtime)`. When a runtime is provided explicitly, it will be used as-is and is not registered in the HMR runtime registry (you manage its lifecycle).
+You can also pass a `ManagedRuntime` instead of a `Layer` when creating a handler using `Next.makeWithRuntime(tag, runtime)`.
 
 ```ts
 import * as Effect from "effect/Effect"
@@ -123,10 +163,6 @@ const HomePage = Effect.fn("HomePage")(function* () {
 
 export default Page.build(HomePage)
 ```
-
-Notes:
-
-- In development, when you pass a `Layer`, the library registers and replaces the runtime in a global registry to support HMR safely. When you pass a `ManagedRuntime` directly, the registry is not updated; disposing/replacing the runtime is up to you.
 
 ### Middlewares with dependencies
 
@@ -203,65 +239,6 @@ const AppLive = Layer.mergeAll(WrappedLive)
 const Page = Next.make("Home", AppLive).middleware(Wrapped)
 ```
 
-### Next.js components
-
-`Next.make(tag, layer).build(handler)` is generic and works for every export.
-
-Route example:
-
-```ts
-// app/api/time/route.ts
-import * as Effect from "effect/Effect"
-import { Layer } from "effect"
-import * as Context from "effect/Context"
-import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
-
-const AppLive = Layer.mergeAll()
-
-const _GET = Effect.fn("ServerTimeRoute")(function* () {
-  const server = yield* ServerTime
-  return { ok: true, now: server.now }
-})
-export const GET = Next.make("ServerTimeRoute", AppLive).middleware(TimeMiddleware).build(_GET)
-
-// Similarly for POST/PUT/DELETE, export POST/PUT/DELETE with the same pattern.
-```
-
-Server action
-
-```ts
-import * as Context from "effect/Context"
-import * as Effect from "effect/Effect"
-import { Layer } from "effect"
-import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
-
-export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
-
-export class Auth extends NextMiddleware.Tag<Auth>()("Auth", {
-  provides: CurrentUser
-}) {}
-
-const AuthLive = Layer.succeed(
-  Auth,
-  Auth.of(() => Effect.succeed({ id: "u1", name: "Ada" }))
-)
-const AppLive = Layer.mergeAll(AuthLive)
-
-// Prepare a reusable builder (middlewares, runtime, etc.)
-const UpdateNameAction = Next.make("UpdateName", AppLive).middleware(Auth)
-
-// Define the Effect program separately (keeps types local to the program)
-const _updateName = Effect.fn("updateName")((input: { name: string }) =>
-  Effect.gen(function* () {
-    const user = yield* CurrentUser
-    return { ok: true, name: input.name, by: user.id }
-  })
-)
-
-// Exported server action: call .build(program)(input)
-export const updateName = UpdateNameAction.build(_updateName)
-```
-
 ### Next.js Route Props Helpers Integration
 
 With Next.js 15.5, you can now use the globally available `PageProps` and `LayoutProps` types for fully typed route parameters without manual definitions. You can use them with this library as follows:
@@ -301,18 +278,3 @@ export default dashboardLayout
 ```
 
 See the official documentation: - [Next.js 15.5 – Route Props Helpers](https://nextjs.org/docs/app/getting-started/layouts-and-pages#route-props-helpers)
-
-### Why the new syntax?
-
-#### Less Opinionated
-
-In the previous version the library was adding too many layers of abstractions, and the scope was too broad. Now it is more focused on the core functionality, and less opinionated. For example in the previous version it was always decoding input from server actions, that, even though it is a good practice, it should not be responsibility of the library and it is now left to the user to decide how to parse the input, decode params/search params, etc.
-
-#### Closer to Next.js APIs
-
-With the newest Next.js 15.5 release, and the new `PageProps`/`LayoutProps` types, it is clear that the library should have dynamic props instead of pre-defined ones that we pre-process. This will make it easier to follow the Next.js updates and make the library more flexible.
-For example in the previous version it was not possible to access parallel routes slots in layouts.
-
-#### The Effect way
-
-With the new architecture it also enables a more Effect-like way to build handlers. It is now possible to use `Effect.fn` directly inside the handler, delegating to the official ways to do tracing, logging, etc.

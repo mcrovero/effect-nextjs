@@ -1,9 +1,9 @@
 /**
  * @since 0.5.0
  */
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import * as Context_ from "effect/Context"
-import type * as Layer from "effect/Layer"
+import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
@@ -11,7 +11,6 @@ import type * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
 import { executeWithRuntime } from "./internal/executor.js"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
-import { getRuntime, setRuntime } from "./internal/runtime-registry.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
 
 /**
@@ -143,13 +142,8 @@ const Proto = {
         }
         return yield* handlerEffect
       })
-      /**
-       * In development we use global registry to get the runtime
-       * to support hot-reloading.
-       */
       if (runtime) {
-        const actualRuntime = getRuntime(`${NextSymbolKey}/${this._tag}`, runtime)
-        return executeWithRuntime(actualRuntime, program as Effect.Effect<any, any, never>)
+        return executeWithRuntime(runtime, program as Effect.Effect<any, any, never>)
       }
       return executeWithRuntime(undefined, program as Effect.Effect<any, any, never>)
     }
@@ -178,30 +172,22 @@ const makeProto = <
  * @since 0.5.0
  * @category constructors
  */
-export function make<const Tag extends string>(tag: Tag): Next<Tag, undefined>
 export function make<
   const Tag extends string,
-  const L extends Layer.Layer<any, any, never>
+  const R,
+  const E
 >(
   tag: Tag,
-  layer: L
-): Next<Tag, L>
-export function make(
-  tag: string,
-  layer?: Layer.Layer<any, any, never>
-): Next<any, any> {
-  if (layer) {
-    const runtime = ManagedRuntime.make(layer)
-    // We set the runtime in the registry only if created by libary if not the user manages it
-    setRuntime(`${NextSymbolKey}/${tag}`, runtime)
-    return makeProto({
-      _tag: tag as any,
-      runtime,
-      middlewares: [] as Array<never>
-    })
-  }
+  layer: Layer.Layer<R, E, never>
+): Next<Tag, Layer.Layer<R, E, never>> {
+  const runtime = ManagedRuntime.make(
+    // We disable the unhandled error log level to clutter the console with 404, redirect, notFound, etc.
+    Layer.mergeAll(layer, Layer.setUnhandledErrorLogLevel(Option.none()))
+  )
+
   return makeProto({
     _tag: tag as any,
+    runtime,
     middlewares: [] as Array<never>
   })
 }
@@ -212,10 +198,11 @@ export function make(
  */
 export function makeWithRuntime<
   const Tag extends string,
-  const R extends ManagedRuntime.ManagedRuntime<any, any>
+  R,
+  E
 >(
   tag: Tag,
-  runtime: R
+  runtime: ManagedRuntime.ManagedRuntime<R, E>
 ): Next<Tag, undefined> {
   return makeProto({
     _tag: tag as any,
