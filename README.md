@@ -8,7 +8,7 @@ Write your Next.js App Router pages, layouts, server components, routes, and act
 - **End-to-end Effect**: Write your app logic as Effect while keeping familiar Next.js ergonomics.
 - **Composable middlewares**: Add auth and other cross‑cutting concerns in a clear, reusable way.
 - **Works with Next.js**: `redirect`, `notFound`, and other control‑flow behaviors just work. Also provides Effect versions of the utilities.
-- **Confident routing**: Decode route params and search params with Effect Schema for safer handlers.
+- **Safe routing**: Decode route params and search params with Effect Schema for safer handlers.
 - **Cache‑ready**: Plays well with `@mcrovero/effect-react-cache` (react-cache wrapper) across pages, layouts, and components.
 
 > [!WARNING]
