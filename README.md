@@ -30,8 +30,6 @@ pnpx create-next-app@latest
 
 2. Define Next effect runtime
 
-> It is important that all layers passed to the runtime are stateless. If you need to use a stateful layer like a database connection read below. (see [Stateful layers](#stateful-layers))
-
 ```ts
 // lib/runtime.ts
 import { Next } from "@mcrovero/effect-nextjs"
@@ -40,6 +38,8 @@ import { Layer } from "effect"
 const AppLive = Layer.empty // Your stateless layers
 export const BasePage = Next.make("BasePage", AppLive)
 ```
+
+> [!WARNING] It is important that all layers passed to the runtime are stateless. If you need to use a stateful layer like a database connection read below. (see [Stateful layers](#stateful-layers))
 
 3. Write your first page
 
@@ -99,6 +99,14 @@ const HomePage = () =>
 
 export default AuthenticatedPage.build(HomePage)
 ```
+
+You can provide as many middlewares as you want.
+
+```ts
+const HomePage = AuthenticatedPage.middleware(LocaleMiddleware).middleware(TimezoneMiddleware).build(HomePage)
+```
+
+> [!WARNING] The middleware order is important. The middleware will be executed in the order they are provided from left to right.
 
 ### Effect Next.js utilities
 
