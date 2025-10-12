@@ -255,7 +255,7 @@ export const statefulRuntime = globalValue("BasePage", () => {
 Then you can use it directly using `Next.makeWithRuntime`.
 
 ```ts
-export const BasePage = Next.makeWithRuntime("HomePage", statefulRuntime)
+export const BasePage = Next.makeWithRuntime("BasePage", statefulRuntime)
 ```
 
 Or you can extract the context you need from the stateful runtime and using it in a stateless layer.
@@ -264,7 +264,7 @@ This way you'll get HMR for the stateless layer and clean disposal of the statef
 ```ts
 const EphemeralLayer = Layer.effectContext(statefulRuntime.runtimeEffect.pipe(Effect.map((runtime) => runtime.context)))
 
-export const BasePage = Next.make("HomePage", EphemeralLayer)
+export const BasePage = Next.make("BasePage", EphemeralLayer)
 ```
 
 ### Next.js Route Props Helpers Integration
@@ -303,3 +303,44 @@ export default Next.make("DashboardLayout", AppLive).build(DashboardLayout)
 ```
 
 See the official documentation: - [Next.js 15.5 – Route Props Helpers](https://nextjs.org/docs/app/getting-started/layouts-and-pages#route-props-helpers)
+
+### OpenTelemetry
+
+Setup nextjs telemetry following official documentation: - [OpenTelemetry](https://nextjs.org/docs/app/guides/open-telemetry)
+
+Then install @effect/opentelemetry
+
+```sh
+pnpm add @effect/opentelemetry
+```
+
+Create the tracer layer
+
+```ts
+import { Tracer as OtelTracer, Resource } from "@effect/opentelemetry"
+import { Effect, Layer, Option } from "effect"
+
+export const layerTracer = OtelTracer.layerGlobal.pipe(
+  Layer.provide(
+    Layer.unwrapEffect(
+      Effect.gen(function* () {
+        const resource = yield* Effect.serviceOption(Resource.Resource)
+        if (Option.isSome(resource)) {
+          return Layer.succeed(Resource.Resource, resource.value)
+        }
+        return Resource.layerFromEnv()
+      })
+    )
+  )
+)
+```
+
+and provide it to the Next runtime
+
+```ts
+export const AppLiveWithTracer = AppLive.pipe(Layer.provideMerge(layerTracer))
+```
+
+```ts
+export const BasePage = Next.make("BasePage", AppLiveWithTracer)
+```
