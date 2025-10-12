@@ -2,9 +2,9 @@ import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { ParseError } from "effect/ParseResult"
+import { decodeParamsUnknown } from "src/Params.js"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
-import { decodeParamsUnknown } from "./utils/params.js"
 
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
 
