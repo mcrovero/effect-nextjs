@@ -1,5 +1,12 @@
 # @mcrovero/effect-nextjs
 
+## 0.30.0
+
+### Minor Changes
+
+- [#44](https://github.com/mcrovero/effect-nextjs/pull/44) [`66b4496`](https://github.com/mcrovero/effect-nextjs/commit/66b4496e3b12160025f1cc71b7d1e8bc30f287fc) Thanks @mcrovero! - Now Nextjs is a peer dependency to be able to use the unstable_throw and effect versions of the Nextjs control-flow redirect, notFound etc.
+  Removed runtime registry and related options, you should now only pass stateless Services to Next.
+
 ## 0.21.0
 
 ### Minor Changes
