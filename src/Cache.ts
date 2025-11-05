@@ -2,7 +2,16 @@
  * @since 0.30.0
  */
 import { Effect } from "effect"
-import { revalidatePath, revalidateTag } from "next/cache.js"
+import * as Context_ from "effect/Context"
+import type { revalidatePath } from "next/cache.js"
+import { revalidateTag } from "next/cache.js"
+
+// Declaring a tag for the RevalidatePathFn service
+export class RevalidatePathFn extends Context_.Tag("RevalidatePathFn")<
+  RevalidatePathFn,
+  (...args: Parameters<typeof revalidatePath>) => void
+>() {}
+
 /**
  * Revalidate a specific path.
  *
@@ -11,7 +20,12 @@ import { revalidatePath, revalidateTag } from "next/cache.js"
  */
 export const RevalidatePath = (
   ...args: Parameters<typeof revalidatePath>
-): Effect.Effect<void, never, never> => Effect.sync(() => revalidatePath(...args))
+): Effect.Effect<void, never, never> =>
+  Effect.gen(function*() {
+    const context = yield* Effect.context<never>()
+    const revalidatePathFn = Context_.unsafeGet(context, RevalidatePathFn)
+    revalidatePathFn(...args)
+  })
 
 /**
  * Revalidate a cache tag.
