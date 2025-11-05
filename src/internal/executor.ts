@@ -2,7 +2,10 @@ import { Cause, Chunk, Effect, Exit } from "effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
 import { revalidatePath, revalidateTag } from "next/cache.js"
 import { unstable_rethrow } from "next/dist/client/components/unstable-rethrow.server.js"
+import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external.js"
+import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-async-storage.external.js"
 import { RevalidatePathFn, RevalidateTagFn } from "../Cache.js"
+import * as AsyncContext from "./async-context.js"
 
 /**
  * @since 0.5.0
@@ -15,22 +18,37 @@ export const executeWithRuntime = async <A>(
   let effect_ = effect as Effect.Effect<A, any, never>
 
   /**
-   * Workaround to revalidate paths and tags in the same effect.
+   * Capture Next.js AsyncLocalStorage context to restore it when revalidation functions are called.
+   * This allows revalidation to happen immediately within the Effect flow while maintaining
+   * access to Next.js internal state.
    */
-  const willRevalidatePaths = new Set<Parameters<typeof revalidatePath>>()
-  const willRevalidateTags = new Set<Parameters<typeof revalidateTag>>()
-  const revalidatePathFn = (...args: Parameters<typeof revalidatePath>) => {
-    willRevalidatePaths.add(args)
+  const asyncStorageDeps: AsyncContext.AsyncStorageDeps = {
+    workAsyncStorage,
+    workUnitAsyncStorage
   }
-  const revalidateTagFn = (...args: Parameters<typeof revalidateTag>) => {
-    willRevalidateTags.add(args)
-  }
+  const capturedContext = AsyncContext.captureContext(asyncStorageDeps)
+
+  // Create context-aware wrappers for revalidation functions
+  const revalidatePathFn = AsyncContext.withRestoredContext(
+    capturedContext,
+    asyncStorageDeps,
+    revalidatePath
+  )
+
+  const revalidateTagFn = AsyncContext.withRestoredContext(
+    capturedContext,
+    asyncStorageDeps,
+    revalidateTag
+  )
+
+  // Provide the wrapped functions as services to the Effect
   effect_ = effect_.pipe(Effect.provideService(RevalidatePathFn, revalidatePathFn))
   effect_ = effect_.pipe(Effect.provideService(RevalidateTagFn, revalidateTagFn))
 
   const result = runtime
     ? await runtime.runPromiseExit(effect_)
     : await Effect.runPromiseExit(effect_)
+
   if (Exit.isFailure(result)) {
     const defects = Chunk.toArray(Cause.defects(result.cause))
     if (defects.length === 1) {
@@ -41,12 +59,5 @@ export const executeWithRuntime = async <A>(
     throw errors[0]
   }
 
-  // Revalidate paths and tags
-  for (const args of willRevalidatePaths) {
-    revalidatePath(...args)
-  }
-  for (const args of willRevalidateTags) {
-    revalidateTag(...args)
-  }
   return result.value
 }

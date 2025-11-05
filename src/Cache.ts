@@ -26,11 +26,10 @@ export class RevalidateTagFn extends Context_.Tag("RevalidateTagFn")<
 export const RevalidatePath = (
   ...args: Parameters<typeof revalidatePath>
 ): Effect.Effect<void, never, never> =>
-  Effect.gen(function*() {
-    const context = yield* Effect.context<never>()
-    const revalidatePathFn = Context_.unsafeGet(context, RevalidatePathFn)
-    yield* Effect.sync(() => revalidatePathFn(...args))
-  })
+  Effect.flatMap(
+    Effect.context<never>(),
+    (context) => Effect.sync(() => Context_.unsafeGet(context, RevalidatePathFn)(...args))
+  )
 
 /**
  * Revalidate a cache tag.
@@ -41,8 +40,7 @@ export const RevalidatePath = (
 export const RevalidateTag = (
   ...args: Parameters<typeof revalidateTag>
 ): Effect.Effect<void, never, never> =>
-  Effect.gen(function*() {
-    const context = yield* Effect.context<never>()
-    const revalidateTagFn = Context_.unsafeGet(context, RevalidateTagFn)
-    yield* Effect.sync(() => revalidateTagFn(...args))
-  })
+  Effect.flatMap(
+    Effect.context<never>(),
+    (context) => Effect.sync(() => Context_.unsafeGet(context, RevalidateTagFn)(...args))
+  )
