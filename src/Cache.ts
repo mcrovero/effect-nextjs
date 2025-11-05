@@ -3,13 +3,18 @@
  */
 import { Effect } from "effect"
 import * as Context_ from "effect/Context"
-import type { revalidatePath } from "next/cache.js"
-import { revalidateTag } from "next/cache.js"
+import type { revalidatePath, revalidateTag } from "next/cache.js"
 
 // Declaring a tag for the RevalidatePathFn service
 export class RevalidatePathFn extends Context_.Tag("RevalidatePathFn")<
   RevalidatePathFn,
   (...args: Parameters<typeof revalidatePath>) => void
+>() {}
+
+// Declaring a tag for the RevalidatePathFn service
+export class RevalidateTagFn extends Context_.Tag("RevalidateTagFn")<
+  RevalidateTagFn,
+  (...args: Parameters<typeof revalidateTag>) => void
 >() {}
 
 /**
@@ -24,7 +29,7 @@ export const RevalidatePath = (
   Effect.gen(function*() {
     const context = yield* Effect.context<never>()
     const revalidatePathFn = Context_.unsafeGet(context, RevalidatePathFn)
-    revalidatePathFn(...args)
+    yield* Effect.sync(() => revalidatePathFn(...args))
   })
 
 /**
@@ -35,4 +40,9 @@ export const RevalidatePath = (
  */
 export const RevalidateTag = (
   ...args: Parameters<typeof revalidateTag>
-): Effect.Effect<void, never, never> => Effect.sync(() => revalidateTag(...args))
+): Effect.Effect<void, never, never> =>
+  Effect.gen(function*() {
+    const context = yield* Effect.context<never>()
+    const revalidateTagFn = Context_.unsafeGet(context, RevalidateTagFn)
+    yield* Effect.sync(() => revalidateTagFn(...args))
+  })

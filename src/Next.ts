@@ -9,8 +9,6 @@ import type { Pipeable } from "effect/Pipeable"
 import { pipeArguments } from "effect/Pipeable"
 import type * as Schema from "effect/Schema"
 import type * as AST from "effect/SchemaAST"
-import { revalidatePath } from "next/cache.js"
-import { RevalidatePathFn } from "./Cache.js"
 import { executeWithRuntime } from "./internal/executor.js"
 import { createMiddlewareChain } from "./internal/middleware-chain.js"
 import type * as NextMiddleware from "./NextMiddleware.js"
@@ -144,15 +142,10 @@ const Proto = {
         }
         return yield* handlerEffect
       })
-      const revalidatePathFn = (...args: Parameters<typeof revalidatePath>) => {
-        return revalidatePath(...args)
-      }
-      const programWithRevalidatePath = program.pipe(Effect.provideService(RevalidatePathFn, revalidatePathFn))
-
       if (runtime) {
-        return executeWithRuntime(runtime, programWithRevalidatePath as Effect.Effect<any, any, never>)
+        return executeWithRuntime(runtime, program as Effect.Effect<any, any, never>)
       }
-      return executeWithRuntime(undefined, programWithRevalidatePath as Effect.Effect<any, any, never>)
+      return executeWithRuntime(undefined, program as Effect.Effect<any, any, never>)
     }
   }
 }
