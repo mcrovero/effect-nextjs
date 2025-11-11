@@ -7,6 +7,7 @@
  * @internal
  */
 
+import * as Context_ from "effect/Context"
 import type { AsyncLocalStorage as AsyncLocalStorageType } from "node:async_hooks"
 
 /**
@@ -70,3 +71,38 @@ export const withRestoredContext = <Args extends ReadonlyArray<unknown>, R>(
     return fn(...args)
   }
 }
+
+/**
+ * Creates a reusable wrapper factory that can wrap any function with the captured context.
+ * This avoids passing the same context and deps repeatedly.
+ *
+ * @internal
+ */
+export const createContextWrapper = (
+  context: CapturedContext,
+  deps: AsyncStorageDeps
+) => {
+  return <Args extends ReadonlyArray<unknown>, R>(
+    fn: (...args: Args) => R
+  ): (...args: Args) => R => {
+    return withRestoredContext(context, deps, fn)
+  }
+}
+
+/**
+ * Type for the context wrapper function.
+ * @internal
+ */
+export type ContextWrapper = ReturnType<typeof createContextWrapper>
+
+/**
+ * Service tag for the context wrapper.
+ * Allows functions to wrap themselves with AsyncLocalStorage context.
+ *
+ * @since 0.31.0
+ * @internal
+ */
+export class ContextWrapperService extends Context_.Tag("ContextWrapperService")<
+  ContextWrapperService,
+  ContextWrapper
+>() {}

@@ -3,19 +3,8 @@
  */
 import { Effect } from "effect"
 import * as Context_ from "effect/Context"
-import type { revalidatePath, revalidateTag } from "next/cache.js"
-
-// Declaring a tag for the RevalidatePathFn service
-export class RevalidatePathFn extends Context_.Tag("RevalidatePathFn")<
-  RevalidatePathFn,
-  (...args: Parameters<typeof revalidatePath>) => void
->() {}
-
-// Declaring a tag for the RevalidatePathFn service
-export class RevalidateTagFn extends Context_.Tag("RevalidateTagFn")<
-  RevalidateTagFn,
-  (...args: Parameters<typeof revalidateTag>) => void
->() {}
+import { revalidatePath, revalidateTag } from "next/cache.js"
+import { ContextWrapperService } from "./internal/async-context.js"
 
 /**
  * Revalidate a specific path.
@@ -28,7 +17,11 @@ export const RevalidatePath = (
 ): Effect.Effect<void, never, never> =>
   Effect.flatMap(
     Effect.context<never>(),
-    (context) => Effect.sync(() => Context_.unsafeGet(context, RevalidatePathFn)(...args))
+    (context) => {
+      const wrapWithContext = Context_.unsafeGet(context, ContextWrapperService)
+      const wrappedFn = wrapWithContext(revalidatePath)
+      return Effect.sync(() => wrappedFn(...args))
+    }
   )
 
 /**
@@ -42,5 +35,9 @@ export const RevalidateTag = (
 ): Effect.Effect<void, never, never> =>
   Effect.flatMap(
     Effect.context<never>(),
-    (context) => Effect.sync(() => Context_.unsafeGet(context, RevalidateTagFn)(...args))
+    (context) => {
+      const wrapWithContext = Context_.unsafeGet(context, ContextWrapperService)
+      const wrappedFn = wrapWithContext(revalidateTag)
+      return Effect.sync(() => wrappedFn(...args))
+    }
   )

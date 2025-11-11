@@ -1,10 +1,8 @@
 import { Cause, Chunk, Effect, Exit } from "effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
-import { revalidatePath, revalidateTag } from "next/cache.js"
 import { unstable_rethrow } from "next/dist/client/components/unstable-rethrow.server.js"
 import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external.js"
 import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-async-storage.external.js"
-import { RevalidatePathFn, RevalidateTagFn } from "../Cache.js"
 import * as AsyncContext from "./async-context.js"
 
 /**
@@ -18,9 +16,9 @@ export const executeWithRuntime = async <A>(
   let effect_ = effect as Effect.Effect<A, any, never>
 
   /**
-   * Capture Next.js AsyncLocalStorage context to restore it when revalidation functions are called.
-   * This allows revalidation to happen immediately within the Effect flow while maintaining
-   * access to Next.js internal state.
+   * Capture Next.js AsyncLocalStorage context to restore it when Next.js functions are called.
+   * This allows Next.js functions (revalidation, cookies, headers, draftMode) to work correctly
+   * within the Effect flow while maintaining access to Next.js internal state.
    */
   const asyncStorageDeps: AsyncContext.AsyncStorageDeps = {
     workAsyncStorage,
@@ -28,22 +26,11 @@ export const executeWithRuntime = async <A>(
   }
   const capturedContext = AsyncContext.captureContext(asyncStorageDeps)
 
-  // Create context-aware wrappers for revalidation functions
-  const revalidatePathFn = AsyncContext.withRestoredContext(
-    capturedContext,
-    asyncStorageDeps,
-    revalidatePath
-  )
+  // Create a reusable wrapper factory with the captured context
+  const wrapWithContext = AsyncContext.createContextWrapper(capturedContext, asyncStorageDeps)
 
-  const revalidateTagFn = AsyncContext.withRestoredContext(
-    capturedContext,
-    asyncStorageDeps,
-    revalidateTag
-  )
-
-  // Provide the wrapped functions as services to the Effect
-  effect_ = effect_.pipe(Effect.provideService(RevalidatePathFn, revalidatePathFn))
-  effect_ = effect_.pipe(Effect.provideService(RevalidateTagFn, revalidateTagFn))
+  // Provide the context wrapper as a service so functions can wrap themselves
+  effect_ = effect_.pipe(Effect.provideService(AsyncContext.ContextWrapperService, wrapWithContext))
 
   const result = runtime
     ? await runtime.runPromiseExit(effect_)
