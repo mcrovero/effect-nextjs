@@ -15,21 +15,13 @@ export const executeWithRuntime = async <A>(
 ): Promise<A> => {
   let effect_ = effect as Effect.Effect<A, any, never>
 
-  /**
-   * Capture Next.js AsyncLocalStorage context to restore it when Next.js functions are called.
-   * This allows Next.js functions (revalidation, cookies, headers, draftMode) to work correctly
-   * within the Effect flow while maintaining access to Next.js internal state.
-   */
   const asyncStorageDeps: AsyncContext.AsyncStorageDeps = {
     workAsyncStorage,
     workUnitAsyncStorage
   }
   const capturedContext = AsyncContext.captureContext(asyncStorageDeps)
-
-  // Create a reusable wrapper factory with the captured context
   const wrapWithContext = AsyncContext.createContextWrapper(capturedContext, asyncStorageDeps)
 
-  // Provide the context wrapper as a service so functions can wrap themselves
   effect_ = effect_.pipe(Effect.provideService(AsyncContext.ContextWrapperService, wrapWithContext))
 
   const result = runtime
