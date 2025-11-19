@@ -29,7 +29,7 @@
   },
   "peerDependencies": {
     "effect": "^3",
-    "next": "^15"
+    "next": "^15 || ^16"
   },
   "devDependencies": {
     "@babel/cli": "^7.24.8",
