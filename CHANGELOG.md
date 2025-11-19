@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.31.0
+
+### Minor Changes
+
+- [#46](https://github.com/mcrovero/effect-nextjs/pull/46) [`86f98cd`](https://github.com/mcrovero/effect-nextjs/commit/86f98cdd8b264758e62a45f3403c276cd4e85228) Thanks @mcrovero! - Added support for AsyncLocalStorage from Next.js to properly capture and restore context for cache revalidation. The library now imports `workAsyncStorage` and `workUnitAsyncStorage` from Next.js internal modules and uses them to maintain context across async boundaries, ensuring proper cache revalidation behavior.
+
 ## 0.30.0
 
 ### Minor Changes
