@@ -1,6 +1,7 @@
 import { fixupPluginRules } from "@eslint/compat"
 import { FlatCompat } from "@eslint/eslintrc"
 import js from "@eslint/js"
+import effectPlugin from "@effect/eslint-plugin"
 import tsParser from "@typescript-eslint/parser"
 import codegen from "eslint-plugin-codegen"
 import _import from "eslint-plugin-import"
@@ -24,15 +25,15 @@ export default [
   ...compat.extends(
     "eslint:recommended",
     "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended",
-    "plugin:@effect/recommended"
+    "plugin:@typescript-eslint/recommended"
   ),
   {
     plugins: {
       import: fixupPluginRules(_import),
       "sort-destructure-keys": sortDestructureKeys,
       "simple-import-sort": simpleImportSort,
-      codegen
+      codegen,
+      "@effect": effectPlugin
     },
 
     languageOptions: {
