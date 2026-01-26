@@ -203,7 +203,7 @@ export function makeWithRuntime<
 >(
   tag: Tag,
   runtime: ManagedRuntime.ManagedRuntime<R, E>
-): Next<Tag, undefined> {
+): Next<Tag, Layer.Layer<R, E, never>> {
   return makeProto({
     _tag: tag as any,
     runtime,
