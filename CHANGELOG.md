@@ -1,5 +1,11 @@
 # @mcrovero/effect-nextjs
 
+## 0.31.1
+
+### Patch Changes
+
+- [`8eb214a`](https://github.com/mcrovero/effect-nextjs/commit/8eb214a338736949052ffa6deecedd35067bfead) Thanks @mcrovero! - bump deps and fix makeWithRuntime type signature
+
 ## 0.31.0
 
 ### Minor Changes
