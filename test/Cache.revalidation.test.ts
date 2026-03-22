@@ -5,40 +5,13 @@ import { vi } from "vitest"
 import * as Cache from "../src/Cache.js"
 import * as Next from "../src/Next.js"
 
-// Mock Next.js cache functions and AsyncLocalStorage
+// Mock Next.js cache functions
 const mockRevalidatePath = vi.fn()
 const mockRevalidateTag = vi.fn()
-
-// Mock workStore and workUnitStore
-const mockWorkStore = {
-  route: "/test",
-  incrementalCache: {},
-  pendingRevalidatedTags: [],
-  pathWasRevalidated: false
-}
-
-const mockWorkUnitStore = {
-  phase: "request" as const,
-  type: "request" as const
-}
 
 vi.mock("next/cache.js", () => ({
   revalidatePath: (...args: Array<any>) => mockRevalidatePath(...args),
   revalidateTag: (...args: Array<any>) => mockRevalidateTag(...args)
-}))
-
-vi.mock("next/dist/server/app-render/work-async-storage.external.js", () => ({
-  workAsyncStorage: {
-    getStore: () => mockWorkStore,
-    run: (store: any, fn: () => void) => fn()
-  }
-}))
-
-vi.mock("next/dist/server/app-render/work-unit-async-storage.external.js", () => ({
-  workUnitAsyncStorage: {
-    getStore: () => mockWorkUnitStore,
-    run: (store: any, fn: () => void) => fn()
-  }
 }))
 
 describe("Cache revalidation", () => {

@@ -16,10 +16,10 @@ Write your Next.js App Router pages, layouts, server components, routes, and act
 
 ### Getting Started
 
-1. Install effect and the library in an existing Next.js 15+ application
+1. Install `effect@3.20.0` or newer and the library in an existing Next.js 15+ application
 
 ```sh
-pnpm add @mcrovero/effect-nextjs effect
+pnpm add @mcrovero/effect-nextjs effect@^3.20.0
 ```
 
 or create a new Next.js application first:
@@ -27,6 +27,9 @@ or create a new Next.js application first:
 ```sh
 pnpx create-next-app@latest
 ```
+
+> [!IMPORTANT]
+> This library requires `effect >= 3.20.0`. Older Effect releases can lose Node.js `AsyncLocalStorage` request context under concurrent load.
 
 2. Define Next effect runtime
 
