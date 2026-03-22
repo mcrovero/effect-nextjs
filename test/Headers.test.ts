@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Layer } from "effect"
+import { Cause, Chunk, Exit, Layer } from "effect"
 import * as Effect from "effect/Effect"
 import type { AsyncLocalStorage } from "node:async_hooks"
 import { vi } from "vitest"
@@ -10,6 +10,15 @@ declare global {
   var __effect_nextjs_headers_request_context__: AsyncLocalStorage<{ requestId: string }>
 }
 
+const requestHelperState = {
+  mutableCookies: false,
+  throwApi: null as null | "headers" | "cookies" | "draftMode"
+}
+
+const headersContextError = new Error("headers() called outside a request scope")
+const cookiesContextError = new Error("cookies() called outside a request scope")
+const draftModeContextError = new Error("draftMode() called outside a request scope")
+
 const getRequestContext = () =>
   globalThis.__effect_nextjs_headers_request_context__ as AsyncLocalStorage<{ requestId: string }>
 
@@ -19,25 +28,70 @@ const mockHeaders = {
       return getRequestContext().getStore()?.requestId ?? null
     }
     return `header:${name}`
+  }),
+  set: vi.fn(() => {
+    throw new Error("Headers cannot be modified")
   })
 }
-const mockCookies = { get: vi.fn((name: string) => ({ name, value: `cookie:${name}` })) }
-const mockDraftMode = { isEnabled: true }
+const mockReadonlyCookies = {
+  get: vi.fn((name: string) => ({ name, value: `cookie:${name}` })),
+  set: vi.fn(() => {
+    throw new Error("Cookies can only be modified in a Server Action or Route Handler")
+  })
+}
+const mutableCookieJar = new Map<string, string>()
+const mockMutableCookies = {
+  get: vi.fn((name: string) => {
+    const value = mutableCookieJar.get(name)
+    return value === undefined ? undefined : { name, value }
+  }),
+  set: vi.fn((name: string, value: string) => {
+    mutableCookieJar.set(name, value)
+  })
+}
+const mockDraftMode = {
+  isEnabled: true,
+  enable: vi.fn(() => {
+    mockDraftMode.isEnabled = true
+  }),
+  disable: vi.fn(() => {
+    mockDraftMode.isEnabled = false
+  })
+}
 
 vi.mock("next/headers.js", async () => {
   const { AsyncLocalStorage } = await import("node:async_hooks")
   globalThis.__effect_nextjs_headers_request_context__ = new AsyncLocalStorage<{ requestId: string }>() as never
 
   return {
-    headers: () => Promise.resolve(mockHeaders),
-    cookies: () => Promise.resolve(mockCookies),
-    draftMode: () => Promise.resolve(mockDraftMode)
+    headers: () => {
+      if (requestHelperState.throwApi === "headers") {
+        throw headersContextError
+      }
+      return Promise.resolve(mockHeaders)
+    },
+    cookies: () => {
+      if (requestHelperState.throwApi === "cookies") {
+        throw cookiesContextError
+      }
+      return Promise.resolve(requestHelperState.mutableCookies ? mockMutableCookies : mockReadonlyCookies)
+    },
+    draftMode: () => {
+      if (requestHelperState.throwApi === "draftMode") {
+        throw draftModeContextError
+      }
+      return Promise.resolve(mockDraftMode)
+    }
   }
 })
 
 describe("Headers", () => {
   it.effect("accesses Next request helpers directly inside the Effect runtime", () =>
     Effect.gen(function*() {
+      requestHelperState.throwApi = null
+      requestHelperState.mutableCookies = false
+      mockDraftMode.isEnabled = true
+      mutableCookieJar.clear()
       const page = Next.make("HeadersTest", Layer.empty)
 
       const handler = Effect.gen(function*() {
@@ -61,8 +115,61 @@ describe("Headers", () => {
       })
     }))
 
+  it.effect("preserves request helper semantics after awaiting them", () =>
+    Effect.gen(function*() {
+      requestHelperState.throwApi = null
+      requestHelperState.mutableCookies = false
+      mockDraftMode.isEnabled = true
+      mutableCookieJar.clear()
+
+      const readonlyHeaders = yield* Headers.Headers
+      assert.throws(() => readonlyHeaders.set("x-test", "value"), /Headers cannot be modified/)
+
+      const readonlyCookies = yield* Headers.Cookies
+      assert.throws(
+        () => readonlyCookies.set("session", "next"),
+        /Cookies can only be modified in a Server Action or Route Handler/
+      )
+
+      requestHelperState.mutableCookies = true
+      const mutableCookies = yield* Headers.Cookies
+      mutableCookies.set("session", "updated")
+      assert.deepStrictEqual(mutableCookies.get("session"), { name: "session", value: "updated" })
+
+      const draftMode = yield* Headers.DraftMode
+      draftMode.disable()
+      assert.strictEqual(draftMode.isEnabled, false)
+      draftMode.enable()
+      assert.strictEqual(draftMode.isEnabled, true)
+    }))
+
+  it.effect("captures synchronous request-scope errors from Next helpers unchanged", () =>
+    Effect.gen(function*() {
+      requestHelperState.mutableCookies = false
+      mockDraftMode.isEnabled = true
+
+      requestHelperState.throwApi = "headers"
+      const headersExit = yield* Headers.Headers.pipe(Effect.exit)
+      assert.ok(Exit.isFailure(headersExit))
+      assert.deepStrictEqual(Chunk.toArray(Cause.defects(headersExit.cause)), [headersContextError])
+
+      requestHelperState.throwApi = "cookies"
+      const cookiesExit = yield* Headers.Cookies.pipe(Effect.exit)
+      assert.ok(Exit.isFailure(cookiesExit))
+      assert.deepStrictEqual(Chunk.toArray(Cause.defects(cookiesExit.cause)), [cookiesContextError])
+
+      requestHelperState.throwApi = "draftMode"
+      const draftModeExit = yield* Headers.DraftMode.pipe(Effect.exit)
+      assert.ok(Exit.isFailure(draftModeExit))
+      assert.deepStrictEqual(Chunk.toArray(Cause.defects(draftModeExit.cause)), [draftModeContextError])
+
+      requestHelperState.throwApi = null
+    }))
+
   it.effect("preserves AsyncLocalStorage context across concurrent requests", () =>
     Effect.gen(function*() {
+      requestHelperState.throwApi = null
+      requestHelperState.mutableCookies = false
       const page = Next.make("HeadersAsyncLocalStorage", Layer.empty)
       const run = page.build(() =>
         Effect.gen(function*() {
