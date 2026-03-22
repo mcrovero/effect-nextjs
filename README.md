@@ -162,17 +162,30 @@ const HomePage = Effect.fn("HomePage")(function* () {
 })
 ```
 
+The cache facade currently wraps the stable cache helpers available in the tested Next 15.5 setup used by this repo. If you are targeting a newer Next release and want newer helpers like `updateTag`, `refresh`, or a profile argument for `revalidateTag`, use the corresponding Next.js helper directly until this package adds first-class wrappers.
+
 Headers:
 
 ```ts
 import { Headers, Cookies, DraftMode } from "@mcrovero/effect-nextjs/Headers"
-Ø
+
 const HomePage = Effect.fn("HomePage")(function* () {
   const headers = yield* Headers
   const cookies = yield* Cookies
   const draftMode = yield* DraftMode
+
+  const requestId = headers.get("x-request-id")
+  const session = cookies.get("session")?.value
+
+  return { requestId, session, isDraft: draftMode.isEnabled }
 })
 ```
+
+`Headers` follows Next.js semantics directly:
+
+- `Headers` is readonly.
+- `Cookies` can always be read, but can only be mutated inside Server Actions or Route Handlers.
+- `DraftMode` returns the live helper object, so `enable()` / `disable()` keep Next.js' normal phase restrictions.
 
 ### Params and Search Params
 

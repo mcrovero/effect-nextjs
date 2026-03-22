@@ -84,12 +84,14 @@ describe("Cache revalidation", () => {
   it.effect("revalidations with type parameter work correctly", () =>
     Effect.gen(function*() {
       mockRevalidatePath.mockClear()
+      mockRevalidateTag.mockClear()
 
       const page = Next.make("CacheTestTypes", Layer.empty)
 
       const handler = Effect.gen(function*() {
         yield* Cache.RevalidatePath("/page-path", "page")
         yield* Cache.RevalidatePath("/layout-path", "layout")
+        yield* Cache.RevalidateTag("tag")
         return "done"
       })
 
@@ -97,13 +99,16 @@ describe("Cache revalidation", () => {
 
       assert.strictEqual(result, "done")
       assert.strictEqual(mockRevalidatePath.mock.calls.length, 2)
+      assert.strictEqual(mockRevalidateTag.mock.calls.length, 1)
       assert.deepStrictEqual(mockRevalidatePath.mock.calls[0], ["/page-path", "page"])
       assert.deepStrictEqual(mockRevalidatePath.mock.calls[1], ["/layout-path", "layout"])
+      assert.deepStrictEqual(mockRevalidateTag.mock.calls[0], ["tag"])
     }))
 
   it.effect("multiple revalidations of same path execute in order", () =>
     Effect.gen(function*() {
       mockRevalidatePath.mockClear()
+      mockRevalidateTag.mockClear()
 
       const page = Next.make("CacheTestDuplicates", Layer.empty)
 
