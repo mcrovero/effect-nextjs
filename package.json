@@ -23,6 +23,7 @@
     "lint": "eslint \"**/{src,test,examples,scripts,dtslint}/**/*.{ts,mjs}\"",
     "lint-fix": "pnpm lint --fix",
     "test": "vitest",
+    "test:next-integration": "pnpm build && vitest --config vitest.next.config.ts",
     "coverage": "vitest --coverage",
     "changeset-version": "changeset version",
     "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish"
@@ -49,7 +50,7 @@
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.53.1",
     "babel-plugin-annotate-pure-calls": "^0.4.0",
-    "effect": "^3.19.15",
+    "effect": "^3.20.0",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-codegen": "^0.34.1",
