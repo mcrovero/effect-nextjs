@@ -29,7 +29,7 @@
     "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish"
   },
   "peerDependencies": {
-    "effect": "^3",
+    "effect": ">=3.20.0 <4",
     "next": "^15 || ^16"
   },
   "devDependencies": {
