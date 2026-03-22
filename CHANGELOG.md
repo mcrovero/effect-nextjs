@@ -1,5 +1,19 @@
 # @mcrovero/effect-nextjs
 
+## 0.32.0
+
+### Minor Changes
+
+- [`e041aa4`](https://github.com/mcrovero/effect-nextjs/commit/e041aa4c2b1668fbd1bced9c9349b1d0fafba7c7) Thanks @mcrovero! - Require `effect >= 3.20.0` and remove the manual Next.js `AsyncLocalStorage` capture/restore workaround. Request helpers and cache revalidation now rely on Effect's patched async context propagation instead of restoring Next internals explicitly.
+
+### Patch Changes
+
+- [#57](https://github.com/mcrovero/effect-nextjs/pull/57) [`c53a8a2`](https://github.com/mcrovero/effect-nextjs/commit/c53a8a298dcb44ac6cef8e8d75ef132ea4367557) Thanks @mcrovero! - Clarify the Next.js request-helper contract in the docs and add regression coverage for readonly headers, cookie mutability, draft mode helpers, and synchronous request-scope errors. Also document that the cache facade currently mirrors the stable cache helpers covered by the repo's tested Next 15.5 setup.
+
+- [#56](https://github.com/mcrovero/effect-nextjs/pull/56) [`1fce6e4`](https://github.com/mcrovero/effect-nextjs/commit/1fce6e4e9f8f6b90afb475745ab9c49fd0d25950) Thanks @mcrovero! - Add a real Next.js integration test fixture that exercises the built package in an App Router app, covering request helpers, middleware-provided context, redirects, notFound handling, and route-handler cookie behavior.
+
+- [#54](https://github.com/mcrovero/effect-nextjs/pull/54) [`24b167b`](https://github.com/mcrovero/effect-nextjs/commit/24b167b3a8a91139129993c559e8b1967c7303e9) Thanks @mcrovero! - Fix interrupt-only handler failures so they reject with a real error instead of `undefined`, and add a regression test for the public `Next.build` path.
+
 ## 0.31.1
 
 ### Patch Changes
