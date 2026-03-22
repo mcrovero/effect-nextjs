@@ -21,7 +21,7 @@ export const executeWithRuntime = async <A>(
     }
     const errors = Cause.prettyErrors(result.cause)
 
-    throw errors[0]
+    throw errors[0] ?? Cause.squash(result.cause)
   }
 
   return result.value
