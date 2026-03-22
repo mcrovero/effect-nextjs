@@ -1,5 +1,5 @@
 {
-  "name": "@mcrovero/effect-nextjs-next-fixture",
+  "name": "private-effect-nextjs-next-fixture",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",
@@ -9,13 +9,13 @@
     "dev": "next dev"
   },
   "dependencies": {
-    "@mcrovero/effect-nextjs": "link:../../dist",
     "effect": "^3.20.0",
     "next": "15.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@mcrovero/effect-nextjs": "link:../../dist",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2"
   }

@@ -105,9 +105,6 @@ importers:
 
   fixtures/next-app:
     dependencies:
-      '@mcrovero/effect-nextjs':
-        specifier: link:../../dist
-        version: link:../../dist
       effect:
         specifier: ^3.20.0
         version: 3.21.0
@@ -121,6 +118,9 @@ importers:
         specifier: ^19.2.0
         version: 19.2.0(react@19.2.0)
     devDependencies:
+      '@mcrovero/effect-nextjs':
+        specifier: link:../../dist
+        version: link:../../dist
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.14
