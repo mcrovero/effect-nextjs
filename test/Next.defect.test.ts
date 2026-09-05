@@ -9,7 +9,7 @@ import * as NextMiddleware from "../src/NextMiddleware.js"
 describe("Next defects", () => {
   it.effect("logs die from handler", () =>
     Effect.gen(function*() {
-      class Dummy0 extends Context.Tag("Dummy0")<Dummy0, object>() {}
+      class Dummy0 extends Context.Service<Dummy0, object>()("Dummy0") {}
       const page = Next.make("Base", Layer.succeed(Dummy0, {}))
 
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
@@ -17,7 +17,7 @@ describe("Next defects", () => {
         const result = yield* Effect.promise(() =>
           page.build(() =>
             Effect.die(new Error("boom-handler")).pipe(
-              Effect.catchAllCause(Effect.logError),
+              Effect.catchCause(Effect.logError),
               Effect.as("ok")
             )
           )()
@@ -25,7 +25,7 @@ describe("Next defects", () => {
 
         assert.strictEqual(result, "ok")
         const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n")
-        assert.ok(output.includes("level=ERROR"))
+        assert.match(output, /ERROR/)
         assert.match(output, /boom-handler/)
       } finally {
         logSpy.mockRestore()
@@ -34,7 +34,7 @@ describe("Next defects", () => {
 
   it.effect("logs die from middleware", () =>
     Effect.gen(function*() {
-      class Dummy extends Context.Tag("Dummy")<Dummy, object>() {}
+      class Dummy extends Context.Service<Dummy, object>()("Dummy") {}
 
       class DefectMiddleware extends NextMiddleware.Tag<DefectMiddleware>()(
         "DefectMiddleware"
@@ -57,12 +57,12 @@ describe("Next defects", () => {
       const either = yield* Effect.tryPromise({
         try: () => page.build(() => Effect.succeed("ok" as const))(),
         catch: (e) => e as Error
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      if (either._tag === "Right") {
+      if (either._tag === "Success") {
         assert.fail("Expected rejection, got success")
       } else {
-        assert.match(either.left.message, /boom-middleware/)
+        assert.match(either.failure.message, /boom-middleware/)
       }
     }))
 })

@@ -16,10 +16,10 @@ Write your Next.js App Router pages, layouts, server components, routes, and act
 
 ### Getting Started
 
-1. Install `effect@3.20.0` or newer and the library in an existing Next.js 15+ application
+1. Install the prerelease in an existing Next.js 15 or 16 application:
 
 ```sh
-pnpm add @mcrovero/effect-nextjs effect@^3.20.0
+pnpm add @mcrovero/effect-nextjs@rc effect@4.0.0-rc.112
 ```
 
 or create a new Next.js application first:
@@ -29,7 +29,9 @@ pnpx create-next-app@latest
 ```
 
 > [!IMPORTANT]
-> This library requires `effect >= 3.20.0`. Older Effect releases can lose Node.js `AsyncLocalStorage` request context under concurrent load.
+> The `0.33` prerelease line requires Effect `^4.0.0-rc.112`. Effect v4 is still a release candidate. Applications using Effect v3 should stay on `@mcrovero/effect-nextjs@~0.32.0` with `effect >=3.20.0 <4`. This release does not mix Effect v3 and v4 runtimes. Next.js 15 and 16 remain supported; use the latest patch of your chosen major.
+
+See [MIGRATION.md](./MIGRATION.md) for the v3-to-v4 changes and tested versions.
 
 2. Define Next effect runtime
 
@@ -70,7 +72,7 @@ import { Layer, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 
-export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
+export class CurrentUser extends Context.Service<CurrentUser, { id: string; name: string }>()("CurrentUser") {}
 
 // Middleware that provides CurrentUser and can fail with a string
 export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()("AuthMiddleware", {
@@ -162,7 +164,7 @@ const HomePage = Effect.fn("HomePage")(function* () {
 })
 ```
 
-The cache facade currently wraps the stable cache helpers available in the tested Next 15.5 setup used by this repo. If you are targeting a newer Next release and want newer helpers like `updateTag`, `refresh`, or a profile argument for `revalidateTag`, use the corresponding Next.js helper directly until this package adds first-class wrappers.
+`RevalidateTag("tag")` expires the tag immediately. On Next.js 16, use `RevalidateTag("tag", "max")` for stale-while-revalidate behavior, or pass `{ expire: 0 }` explicitly for immediate expiration. Next.js 15 ignores the profile argument. Version-specific helpers such as `updateTag` and `refresh` can be wrapped with `Effect.sync` directly in applications running Next.js 16.
 
 Headers:
 
@@ -206,7 +208,7 @@ const HomePage = Effect.fn("HomePage")((props) =>
         Id: {params.id} Name: {searchParams.name}
       </div>
     )),
-    Effect.catchTag("ParseError", () => Effect.succeed(<div>Error decoding params</div>))
+    Effect.catchTag("SchemaError", () => Effect.succeed(<div>Error decoding params</div>))
   )
 )
 
@@ -223,7 +225,7 @@ import * as Effect from "effect/Effect"
 import { Layer, Schema } from "effect"
 import { Next, NextMiddleware } from "@mcrovero/effect-nextjs"
 
-export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
+export class CurrentUser extends Context.Service<CurrentUser, { id: string; name: string }>()("CurrentUser") {}
 
 export class Wrapped extends NextMiddleware.Tag<Wrapped>()("Wrapped", {
   provides: CurrentUser,
@@ -251,23 +253,29 @@ const Page = Next.make("Home", AppLive).middleware(Wrapped)
 
 ### Stateful layers
 
-When using a stateful layer there is no clean way to dispose it safely on HMR in development. You should define the Next runtime globally using `globalValue` from `effect/GlobalValue`.
+Keep stateful runtimes outside the development HMR lifecycle by caching them on `globalThis`. Dispose them when the owning process shuts down.
 
 ```ts
 import { Next } from "@mcrovero/effect-nextjs"
-import { Effect, ManagedRuntime } from "effect"
-import { globalValue } from "effect/GlobalValue"
+import { Context, Effect, Layer, ManagedRuntime } from "effect"
 
-export class StatefulService extends Effect.Service<StatefulService>()("app/StatefulService", {
-  scoped: Effect.gen(function* () {
+export class StatefulService extends Context.Service<StatefulService, object>()("app/StatefulService") {}
+
+const StatefulLive = Layer.effect(
+  StatefulService,
+  Effect.gen(function* () {
     yield* Effect.log("StatefulService scoped")
     yield* Effect.addFinalizer(() => Effect.log("StatefulService finalizer"))
     return {}
   })
-}) {}
+)
 
-export const statefulRuntime = globalValue("BasePage", () => {
-  const managedRuntime = ManagedRuntime.make(StatefulService.Default)
+const globals = globalThis as typeof globalThis & {
+  appRuntime?: ManagedRuntime.ManagedRuntime<StatefulService, never>
+}
+
+export const statefulRuntime = globals.appRuntime ??= (() => {
+  const managedRuntime = ManagedRuntime.make(StatefulLive)
   process.on("SIGINT", () => {
     managedRuntime.dispose()
   })
@@ -275,7 +283,7 @@ export const statefulRuntime = globalValue("BasePage", () => {
     managedRuntime.dispose()
   })
   return managedRuntime
-})
+})()
 ```
 
 Then you can use it directly using `Next.makeWithRuntime`.
@@ -288,7 +296,7 @@ Or you can extract the context you need from the stateful runtime and using it i
 This way you'll get HMR for the stateless layer and clean disposal of the stateful runtime.
 
 ```ts
-const EphemeralLayer = Layer.effectContext(statefulRuntime.runtimeEffect.pipe(Effect.map((runtime) => runtime.context)))
+const EphemeralLayer = Layer.effectContext(statefulRuntime.contextEffect)
 
 export const BasePage = Next.make("BasePage", EphemeralLayer)
 ```
@@ -312,7 +320,7 @@ const BlogPage = Effect.fn("BlogHandler")(function* (props: PageProps<"/blog/[sl
   )
 })
 
-export default Next.make("BlogPage", AppLive).build(BlØogPage)
+export default Next.make("BlogPage", AppLive).build(BlogPage)
 
 // Layout with parallel routes support
 const DashboardLayout = Effect.fn("DashboardLayout")(function* (props: LayoutProps<"/dashboard">) {
@@ -334,31 +342,17 @@ See the official documentation: - [Next.js 15.5 – Route Props Helpers](https:/
 
 Setup nextjs telemetry following official documentation: - [OpenTelemetry](https://nextjs.org/docs/app/guides/open-telemetry)
 
-Then install @effect/opentelemetry
-
-```sh
-pnpm add @effect/opentelemetry
-```
-
-Create the tracer layer
+Effect v4 includes OTLP exporters in `effect/unstable/observability`. For example, send Effect telemetry to an OpenTelemetry collector:
 
 ```ts
-import { Tracer as OtelTracer, Resource } from "@effect/opentelemetry"
-import { Effect, Layer, Option } from "effect"
+import { Layer } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import { Otlp } from "effect/unstable/observability"
 
-export const layerTracer = OtelTracer.layerGlobal.pipe(
-  Layer.provide(
-    Layer.unwrapEffect(
-      Effect.gen(function* () {
-        const resource = yield* Effect.serviceOption(Resource.Resource)
-        if (Option.isSome(resource)) {
-          return Layer.succeed(Resource.Resource, resource.value)
-        }
-        return Resource.layerFromEnv()
-      })
-    )
-  )
-)
+export const layerTracer = Otlp.layerJson({
+  baseUrl: "http://localhost:4318",
+  resource: { serviceName: "next-app" }
+}).pipe(Layer.provide(FetchHttpClient.layer))
 ```
 
 and provide it to the Next runtime

@@ -27,7 +27,7 @@ describe("Middleware failure propagation", () => {
 
       const CatcherLive: Layer.Layer<Catcher> = Layer.succeed(
         Catcher,
-        Catcher.of(({ next }) => next.pipe(Effect.catchAll(() => Effect.succeed("recovered" as const))))
+        Catcher.of(({ next }) => next.pipe(Effect.catch(() => Effect.succeed("recovered" as const))))
       )
 
       const app = Layer.mergeAll(FailingLive, CatcherLive)
@@ -56,12 +56,12 @@ describe("Middleware failure propagation", () => {
       const either = yield* Effect.tryPromise({
         try: () => page.build(() => Effect.succeed("ok" as const))(),
         catch: (e) => e as Error
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      if (either._tag === "Right") {
+      if (either._tag === "Success") {
         assert.fail("Expected failure from middleware, got success")
       } else {
-        assert.match(String(either.left), /mw-fail/)
+        assert.match(String(either.failure), /mw-fail/)
       }
     }))
 })

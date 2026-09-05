@@ -17,7 +17,7 @@ describe("Middleware catches", () => {
         Wrapped.of(({ next }) =>
           Effect.gen(function*() {
             const result = yield* next.pipe(
-              Effect.catchAll((error) => Effect.succeed("Catched: " + error))
+              Effect.catch((error) => Effect.succeed("Catched: " + error))
             )
             return result
           })

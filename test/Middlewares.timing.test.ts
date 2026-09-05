@@ -8,7 +8,7 @@ import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 describe("Next", () => {
-  class Obj extends Context.Tag("Obj")<Obj, { id: string; name: string }>() {}
+  class Obj extends Context.Service<Obj, { id: string; name: string }>()("Obj") {}
 
   class MiddlewareFast extends NextMiddleware.Tag<MiddlewareFast>()(
     "MiddlewareFast",

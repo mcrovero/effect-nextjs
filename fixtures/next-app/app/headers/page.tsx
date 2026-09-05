@@ -2,8 +2,6 @@ import * as RequestState from "@mcrovero/effect-nextjs/Headers"
 import * as Effect from "effect/Effect"
 import { BasePage } from "../../lib/runtime"
 
-export const dynamic = "force-dynamic"
-
 export default BasePage.build(() =>
   Effect.gen(function*() {
     const headers = yield* RequestState.Headers

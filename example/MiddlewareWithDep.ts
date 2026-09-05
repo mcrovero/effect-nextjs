@@ -5,10 +5,10 @@ import * as Schema from "effect/Schema"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
-export class Other extends Context.Tag("Other")<Other, { id: string; name: string }>() {}
+export class Other extends Context.Service<Other, { id: string; name: string }>()("Other") {}
 
 // A simple context tag for the current user
-export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
+export class CurrentUser extends Context.Service<CurrentUser, { id: string; name: string }>()("CurrentUser") {}
 
 // Non-wrapped middleware: runs before and provides a service
 export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()(
@@ -41,7 +41,7 @@ const Page = ({ params }: { params: Promise<{ id: string }> }) =>
     const user = yield* CurrentUser
     yield* Effect.fail("error")
     return { user, params }
-  }).pipe(Effect.catchAll((e) => Effect.succeed({ error: e })))
+  }).pipe(Effect.catch((e) => Effect.succeed({ error: e })))
 
 export default Next.make("Base", ProdLive)
   .middleware(AuthMiddleware)

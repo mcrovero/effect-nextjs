@@ -2,9 +2,8 @@ import { assert, describe, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { RedirectType } from "next/dist/client/components/redirect-error.js"
 import { getRedirectError } from "next/dist/client/components/redirect.js"
-import { notFound } from "next/navigation.js"
+import { notFound, RedirectType } from "next/navigation.js"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
@@ -20,26 +19,32 @@ describe("Wrapper defect propagation", () => {
       const CatcherLive: Layer.Layer<Catcher> = Layer.succeed(
         Catcher,
         // Even if we try to catch failures from `next`, defects must escape untouched
-        Catcher.of(({ next }) => next.pipe(Effect.catchAll(() => Effect.succeed("caught" as const))))
+        Catcher.of(({ next }) => next.pipe(Effect.catch(() => Effect.succeed("caught" as const))))
       )
 
       const page = Next.make("WrapperDefect", CatcherLive).middleware(Catcher)
+      let originalError: unknown
 
       const either = yield* Effect.tryPromise({
         try: () =>
           page.build(() =>
             Effect.sync(() => {
-              notFound()
+              try {
+                notFound()
+              } catch (error) {
+                originalError = error
+                throw error
+              }
             })
           )(),
         catch: (e) => e as Error
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      if (either._tag === "Right") {
+      if (either._tag === "Success") {
         assert.fail("Expected notFound error to escape as rejection")
       } else {
         // Must be the exact same instance that was thrown
-        assert.match((either.left as Error).message, /NEXT_HTTP_ERROR_FALLBACK;404/)
+        assert.strictEqual(either.failure, originalError)
       }
     }))
 
@@ -52,7 +57,7 @@ describe("Wrapper defect propagation", () => {
 
       const CatcherLive: Layer.Layer<Catcher> = Layer.succeed(
         Catcher,
-        Catcher.of(({ next }) => next.pipe(Effect.catchAll(() => Effect.succeed("caught" as const))))
+        Catcher.of(({ next }) => next.pipe(Effect.catch(() => Effect.succeed("caught" as const))))
       )
 
       const page = Next.make("WrapperDefectRedirect", CatcherLive).middleware(Catcher)
@@ -68,14 +73,14 @@ describe("Wrapper defect propagation", () => {
             })
           )(),
         catch: (e) => e as Error
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      if (either._tag === "Right") {
+      if (either._tag === "Success") {
         assert.fail("Expected redirect error to escape as rejection")
       } else {
         // Must be the exact same instance that was thrown
-        assert.ok(either.left === redirectError)
-        assert.match((either.left as Error).message, /NEXT_REDIRECT/)
+        assert.ok(either.failure === redirectError)
+        assert.match((either.failure as Error).message, /NEXT_REDIRECT/)
       }
     }))
 })

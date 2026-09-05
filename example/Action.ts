@@ -5,7 +5,7 @@ import { Next } from "src/index.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
 // A simple context tag for the current user
-export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, { id: string; name: string }>() {}
+export class CurrentUser extends Context.Service<CurrentUser, { id: string; name: string }>()("CurrentUser") {}
 
 // Non-wrapped middleware: runs before and provides a service
 export class AuthMiddleware extends NextMiddleware.Tag<AuthMiddleware>()(

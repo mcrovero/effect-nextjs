@@ -15,11 +15,15 @@ export const RevalidatePath = (
 ): Effect.Effect<void, never, never> => Effect.sync(() => revalidatePath(...args))
 
 /**
- * Revalidate a cache tag.
+ * Revalidate a cache tag. Defaults to immediate expiration, preserving Next 15
+ * behavior. On Next 16, pass "max" for stale-while-revalidate semantics.
+ * Next 15 ignores the profile argument.
  *
  * @since 0.30.0
  * @category cache
  */
 export const RevalidateTag = (
-  ...args: Parameters<typeof revalidateTag>
-): Effect.Effect<void, never, never> => Effect.sync(() => revalidateTag(...args))
+  tag: string,
+  profile: string | { expire?: number } = { expire: 0 }
+): Effect.Effect<void, never, never> =>
+  Effect.sync(() => (revalidateTag as (tag: string, profile: string | { expire?: number }) => void)(tag, profile))

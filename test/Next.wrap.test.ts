@@ -10,7 +10,7 @@ import * as NextMiddleware from "../src/NextMiddleware.js"
 describe("Next wrap middleware", () => {
   it.effect("can override return value", () =>
     Effect.gen(function*() {
-      class Dummy extends Context.Tag("Dummy")<Dummy, { id: string }>() {}
+      class Dummy extends Context.Service<Dummy, { id: string }>()("Dummy") {}
 
       class Wrap extends NextMiddleware.Tag<Wrap>()("Wrap", {
         wrap: true,

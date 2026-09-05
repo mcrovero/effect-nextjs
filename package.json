@@ -1,6 +1,6 @@
 {
   "name": "@mcrovero/effect-nextjs",
-  "version": "0.32.0",
+  "version": "0.33.0-rc.0",
   "type": "module",
   "packageManager": "pnpm@9.10.0",
   "license": "MIT",
@@ -11,7 +11,8 @@
   },
   "publishConfig": {
     "access": "public",
-    "directory": "dist"
+    "directory": "dist",
+    "tag": "rc"
   },
   "scripts": {
     "codegen": "build-utils prepare-v2",
@@ -26,10 +27,10 @@
     "test:next-integration": "pnpm build && vitest --config vitest.next.config.ts",
     "coverage": "vitest --coverage",
     "changeset-version": "changeset version",
-    "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest && changeset publish"
+    "changeset-publish": "pnpm build && TEST_DIST= pnpm vitest run && changeset publish --tag rc"
   },
   "peerDependencies": {
-    "effect": ">=3.20.0 <4",
+    "effect": "^4.0.0-rc.112",
     "next": "^15 || ^16"
   },
   "devDependencies": {
@@ -42,7 +43,7 @@
     "@effect/build-utils": "^0.8.9",
     "@effect/eslint-plugin": "^0.3.2",
     "@effect/language-service": "^0.72.0",
-    "@effect/vitest": "^0.27.0",
+    "@effect/vitest": "4.0.0-rc.112",
     "@eslint/compat": "^2.0.1",
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.2",
@@ -50,16 +51,17 @@
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.53.1",
     "babel-plugin-annotate-pure-calls": "^0.4.0",
-    "effect": "^3.20.0",
+    "effect": "4.0.0-rc.112",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-codegen": "^0.34.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-sort-destructure-keys": "^2.0.0",
+    "next": "16.3.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.0"
   },
   "effect": {
     "generateExports": {

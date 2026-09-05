@@ -28,7 +28,7 @@ export const createMiddlewareChain = (
         tag.provides as any,
         middleware(options) as any
       )
-      : Effect_.zipRight(
+      : Effect_.andThen(
         middleware(options) as any,
         tail
       )

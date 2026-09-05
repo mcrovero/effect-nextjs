@@ -15,6 +15,16 @@ vi.mock("next/cache.js", () => ({
 }))
 
 describe("Cache revalidation", () => {
+  it.effect("forwards Next 16 cache profiles lazily", () =>
+    Effect.gen(function*() {
+      mockRevalidateTag.mockClear()
+      const revalidate = Cache.RevalidateTag("profiled", "max")
+      assert.strictEqual(mockRevalidateTag.mock.calls.length, 0)
+      yield* revalidate
+      yield* Cache.RevalidateTag("immediate", { expire: 0 })
+      assert.deepStrictEqual(mockRevalidateTag.mock.calls, [["profiled", "max"], ["immediate", { expire: 0 }]])
+    }))
+
   it.effect("revalidations execute immediately in order", () =>
     Effect.gen(function*() {
       mockRevalidatePath.mockClear()
@@ -49,7 +59,7 @@ describe("Cache revalidation", () => {
       assert.strictEqual(mockRevalidatePath.mock.calls.length, 2)
       assert.strictEqual(mockRevalidateTag.mock.calls.length, 1)
       assert.deepStrictEqual(mockRevalidatePath.mock.calls[0], ["/path1"])
-      assert.deepStrictEqual(mockRevalidateTag.mock.calls[0], ["tag1"])
+      assert.deepStrictEqual(mockRevalidateTag.mock.calls[0], ["tag1", { expire: 0 }])
       assert.deepStrictEqual(mockRevalidatePath.mock.calls[1], ["/path2"])
     }))
 
@@ -102,7 +112,7 @@ describe("Cache revalidation", () => {
       assert.strictEqual(mockRevalidateTag.mock.calls.length, 1)
       assert.deepStrictEqual(mockRevalidatePath.mock.calls[0], ["/page-path", "page"])
       assert.deepStrictEqual(mockRevalidatePath.mock.calls[1], ["/layout-path", "layout"])
-      assert.deepStrictEqual(mockRevalidateTag.mock.calls[0], ["tag"])
+      assert.deepStrictEqual(mockRevalidateTag.mock.calls[0], ["tag", { expire: 0 }])
     }))
 
   it.effect("multiple revalidations of same path execute in order", () =>

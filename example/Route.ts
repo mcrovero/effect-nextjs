@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Next from "../src/Next.js"
 import * as NextMiddleware from "../src/NextMiddleware.js"
 
-export class ServerTime extends Context.Tag("ServerTime")<ServerTime, { now: number }>() {}
+export class ServerTime extends Context.Service<ServerTime, { now: number }>()("ServerTime") {}
 
 export class TimeMiddleware extends NextMiddleware.Tag<TimeMiddleware>()(
   "TimeMiddleware",

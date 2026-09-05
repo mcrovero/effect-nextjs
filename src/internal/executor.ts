@@ -1,6 +1,5 @@
-import { Cause, Chunk, Effect, Exit } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
-import { unstable_rethrow } from "next/dist/client/components/unstable-rethrow.server.js"
 
 /**
  * @since 0.5.0
@@ -15,9 +14,11 @@ export const executeWithRuntime = async <A>(
     : await Effect.runPromiseExit(effect)
 
   if (Exit.isFailure(result)) {
-    const defects = Chunk.toArray(Cause.defects(result.cause))
-    if (defects.length === 1) {
-      unstable_rethrow(defects[0])
+    const defects = result.cause.reasons.filter(Cause.isDieReason).map((reason) => reason.defect)
+    // Preserve Error identity, including Next.js routing and rendering signals.
+    // No private Next.js error classifier is needed at the Promise boundary.
+    if (defects.length === 1 && defects[0] instanceof Error) {
+      throw defects[0]
     }
     const errors = Cause.prettyErrors(result.cause)
 

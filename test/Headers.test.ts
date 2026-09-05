@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Cause, Chunk, Exit, Layer } from "effect"
+import { Cause, Exit, Layer } from "effect"
 import * as Effect from "effect/Effect"
 import type { AsyncLocalStorage } from "node:async_hooks"
 import { vi } from "vitest"
@@ -151,17 +151,23 @@ describe("Headers", () => {
       requestHelperState.throwApi = "headers"
       const headersExit = yield* Headers.Headers.pipe(Effect.exit)
       assert.ok(Exit.isFailure(headersExit))
-      assert.deepStrictEqual(Chunk.toArray(Cause.defects(headersExit.cause)), [headersContextError])
+      assert.deepStrictEqual(headersExit.cause.reasons.filter(Cause.isDieReason).map((reason) => reason.defect), [
+        headersContextError
+      ])
 
       requestHelperState.throwApi = "cookies"
       const cookiesExit = yield* Headers.Cookies.pipe(Effect.exit)
       assert.ok(Exit.isFailure(cookiesExit))
-      assert.deepStrictEqual(Chunk.toArray(Cause.defects(cookiesExit.cause)), [cookiesContextError])
+      assert.deepStrictEqual(cookiesExit.cause.reasons.filter(Cause.isDieReason).map((reason) => reason.defect), [
+        cookiesContextError
+      ])
 
       requestHelperState.throwApi = "draftMode"
       const draftModeExit = yield* Headers.DraftMode.pipe(Effect.exit)
       assert.ok(Exit.isFailure(draftModeExit))
-      assert.deepStrictEqual(Chunk.toArray(Cause.defects(draftModeExit.cause)), [draftModeContextError])
+      assert.deepStrictEqual(draftModeExit.cause.reasons.filter(Cause.isDieReason).map((reason) => reason.defect), [
+        draftModeContextError
+      ])
 
       requestHelperState.throwApi = null
     }))

@@ -8,26 +8,25 @@ type NextBaseParams = Promise<
  * @since 0.30.0
  * @category params
  */
-export const decodeParamsUnknown = <T, P extends NextBaseParams>(schema: Schema.Schema<T, any>) => (params: P) =>
+export const decodeParamsUnknown = <S extends Schema.Constraint>(schema: S) => (params: NextBaseParams) =>
   Effect.promise(() => params).pipe(
-    Effect.flatMap(Schema.decodeUnknown(schema))
+    Effect.flatMap(Schema.decodeUnknownEffect(schema))
   )
 
 /**
  * @since 0.30.0
  * @category params
  */
-export const decodeSearchParamsUnknown =
-  <T, P extends NextBaseParams>(schema: Schema.Schema<T, any>) => (searchParams: P) =>
-    Effect.promise(() => searchParams).pipe(
-      Effect.flatMap(Schema.decodeUnknown(schema))
-    )
+export const decodeSearchParamsUnknown = <S extends Schema.Constraint>(schema: S) => (searchParams: NextBaseParams) =>
+  Effect.promise(() => searchParams).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(schema))
+  )
 
 /**
  * @since 0.30.0
  * @category params
  */
-export const decodeParams = <T, P>(schema: Schema.Schema<T, P>) => (params: Promise<P>) =>
+export const decodeParams = <S extends Schema.Constraint>(schema: S) => (params: Promise<S["Encoded"]>) =>
   Effect.promise(() => params).pipe(
-    Effect.flatMap(Schema.decode(schema))
+    Effect.flatMap(Schema.decodeEffect(schema))
   )

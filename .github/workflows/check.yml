@@ -55,4 +55,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/setup
-      - run: pnpm test
+      - run: pnpm exec vitest run
+
+  compatibility:
+    name: Next.js ${{ matrix.next }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        next: ["15.0.8", "15.5.25", "16.3.4"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        uses: ./.github/actions/setup
+      - name: Select Next.js version for library and fixture
+        run: |
+          pnpm add -Dw next@${{ matrix.next }}
+          pnpm --filter private-effect-nextjs-next-fixture add next@${{ matrix.next }}
+      - run: pnpm check
+      - run: pnpm exec vitest run
+      - run: pnpm build
+      - run: pnpm exec vitest run --config vitest.next.config.ts

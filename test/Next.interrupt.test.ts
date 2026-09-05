@@ -11,14 +11,14 @@ describe("Next interruption", () => {
       const either = yield* Effect.tryPromise({
         try: () => page.build(() => Effect.interrupt)(),
         catch: (error) => error
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      if (either._tag === "Right") {
+      if (either._tag === "Success") {
         assert.fail("Expected interrupt to reject")
       } else {
-        assert.notStrictEqual(either.left, undefined)
-        assert.ok(either.left instanceof Error)
-        assert.match(String(either.left), /Interrupted/)
+        assert.notStrictEqual(either.failure, undefined)
+        assert.ok(either.failure instanceof Error)
+        assert.match(String(either.failure), /interrupted/i)
       }
     }))
 })
