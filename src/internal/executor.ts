@@ -1,6 +1,6 @@
 import { Cause, Chunk, Effect, Exit } from "effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
-import { unstable_rethrow } from "next/dist/client/components/unstable-rethrow.server.js"
+import { unstable_rethrow } from "next/navigation.js"
 
 /**
  * @since 0.5.0
